@@ -4,7 +4,6 @@ namespace box
 {
     app::app()
     {
-        _nodes.resize(0x7fff);
     }
 
     void app::show()
@@ -103,6 +102,14 @@ namespace box
                 if (ImGui::InputInt("##pd", &_padding))
                 {
                     _padding = _padding > 0 ? _padding : 0;
+                    _dirty   = true;
+                }
+
+                ImGui::Text("Spacing");
+                ImGui::SetNextItemWidth(-1);
+                if (ImGui::InputInt("##sp", &_spacing))
+                {
+                    _spacing = _spacing > 0 ? _spacing : 0;
                     _dirty   = true;
                 }
 
@@ -287,6 +294,10 @@ namespace box
         ImVec2 center(from + size / ImVec2(2, 2));
         ImVec2 origin(center - halftxt);
         ImVec2 mpos = (ImGui::GetMousePos() - origin) / zoom;
+        if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows))
+        {
+            mpos = {NAN, NAN};
+        }
 
         for (auto& el : _items)
         {
@@ -363,6 +374,7 @@ namespace box
         _width     = metadata.get_item("width").get(_width);
         _height    = metadata.get_item("height").get(_height);
         _padding   = metadata.get_item("padding").get(_padding);
+        _spacing   = metadata.get_item("spacing").get(_spacing);
         _trim      = metadata.get_item("trim_alpha").get(_trim);
         _heuristic = metadata.get_item("heuristics").get(_heuristic);
 
@@ -410,6 +422,9 @@ namespace box
             }
         }
 
+        _trimed_width += _spacing;
+        _trimed_height += _spacing;
+
         return true;
     }
 
@@ -423,6 +438,7 @@ namespace box
         metadata.set_item("width", _width);
         metadata.set_item("height", _height);
         metadata.set_item("padding", _padding);
+        metadata.set_item("spacing", _spacing);
         metadata.set_item("trim_alpha", _trim);
         metadata.set_item("heuristics", _heuristic);
 
@@ -576,8 +592,8 @@ namespace box
         }
 
         float occupancy = 0;
-        auto  ret       = maxRects(_width,
-                            _height,
+        auto  ret       = maxRects(_width - _spacing * 2,
+                            _height - _spacing * 2,
                             (int32_t)_item_rect.size(),
                             _item_rect.data(),
                             maxRectsFreeRectChoiceHeuristic(_heuristic),
@@ -591,8 +607,8 @@ namespace box
         for (int32_t n = 0; n < (int32_t)_item_rect.size(); ++n)
         {
             _sprites[n]->_packed        = _item_pos[n].used;
-            _sprites[n]->_region.x      = (float)_item_pos[n].left + _padding;
-            _sprites[n]->_region.y      = (float)_item_pos[n].top + _padding;
+            _sprites[n]->_region.x      = (float)_item_pos[n].left + _padding + _spacing;
+            _sprites[n]->_region.y      = (float)_item_pos[n].top + _padding + _spacing;
             _sprites[n]->_region.width  = (float)_sprites[n]->_img.width;
             _sprites[n]->_region.height = (float)_sprites[n]->_img.height;
             if (!_sprites[n]->_txt.id)
@@ -612,6 +628,9 @@ namespace box
                 }
             }
         }
+        _trimed_width += _spacing;
+        _trimed_height += _spacing;
+
         return ret != -1;
     }
 

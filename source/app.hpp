@@ -1,7 +1,6 @@
 #pragma once
 
 #include "include.hpp"
-#include <imstb_rectpack.h>
 
 namespace box
 {
@@ -45,13 +44,11 @@ namespace box
         std::map<std::string, sprite> _items;
         sprite*                       _active{};
         std::string                   _active_name;
-        stbrp_context                 _context{};
-        std::vector<stbrp_node>       _nodes;
-        std::vector<stbrp_rect>       _rects;
         std::vector<sprite*>          _sprites;
         float                         _zoom{1.0f};
         int32_t                       _heuristic{};
         int32_t                       _padding{};
+        int32_t                       _spacing{};
         int32_t                       _width{512};
         int32_t                       _height{512};
         int32_t                       _trimed_width{512};
