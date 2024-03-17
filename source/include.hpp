@@ -24,6 +24,17 @@
 #include <imgui_stdlib.h>
 #include "rlImGui.h"
 #include "tinyfiledialogs.h"
+#ifdef __cplusplus
+
+extern "C"
+{
+#endif
+
+#include "maxrects.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 namespace std
 {

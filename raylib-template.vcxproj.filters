@@ -11,6 +11,7 @@
     <ClCompile Include="rlimgui\rlImGui.cpp" />
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="tfd\tinyfiledialogs.c" />
+    <ClCompile Include="rbp\maxrects.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\include.hpp" />
@@ -32,5 +33,6 @@
     <ClInclude Include="rlimgui\rlImGuiColors.h" />
     <ClInclude Include="source\app.hpp" />
     <ClInclude Include="tfd\tinyfiledialogs.h" />
+    <ClInclude Include="rbp\maxrects.h" />
   </ItemGroup>
 </Project>

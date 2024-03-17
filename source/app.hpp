@@ -17,15 +17,15 @@ namespace box
 
 
 	class app
-	{
+    {
     public:
         app();
         ~app() = default;
 
-		void show();
+        void show();
         void show_menu();
 
-		void show_properties();
+        void show_properties();
         void show_list();
         void show_texture();
         void show_atlas();
@@ -62,5 +62,8 @@ namespace box
         bool                          _visible_region{true};
         bool                          _dirty{};
         std::string                   _path;
+
+        std::vector<maxRectsSize> _item_rect;
+        std::vector<maxRectsPosition> _item_pos;
     };
 } // namespace box

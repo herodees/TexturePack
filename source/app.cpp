@@ -108,7 +108,15 @@ namespace box
 
                 ImGui::Text("Heuristics algorithm");
                 ImGui::SetNextItemWidth(-1);
-                if (ImGui::Combo("##hr", &_heuristic, "Skyline_BL_sortHeight\0Skyline_BF_sortHeight\0"))
+                const char* options = 
+                    "BestShortSideFit\0"
+                    "BestLongSideFit\0"
+                    "BestAreaFit\0"
+                    "BottomLeftRule\0"
+                    "ContactPointRule\0";
+
+
+                if (ImGui::Combo("##hr", &_heuristic, options))
                 {
                     _dirty = true;
                 }
@@ -393,11 +401,11 @@ namespace box
                 itm._img = ImageFromImage(img, itm._region);
                 if (_trimed_width < itm._region.x + itm._region.width + _padding)
                 {
-                    _trimed_width = itm._region.x + itm._region.width + _padding;
+                    _trimed_width = int32_t(itm._region.x + itm._region.width) + _padding;
                 }
                 if (_trimed_height < itm._region.y + itm._region.height + _padding)
                 {
-                    _trimed_height = itm._region.y + itm._region.height + _padding;
+                    _trimed_height = int32_t(itm._region.y + itm._region.height) + _padding;
                 }
             }
         }
@@ -554,51 +562,57 @@ namespace box
 
     bool app::repack()
     {
-        _rects.clear();
+        _item_rect.clear();
+        _item_pos.clear();
         _sprites.clear();
+
         for (auto& el : _items)
         {
-            auto& rc = _rects.emplace_back();
-            rc.w     = el.second._img.width + _padding * 2;
-            rc.h     = el.second._img.height + _padding * 2;
-            rc.id    = (int32_t)_sprites.size();
             _sprites.emplace_back(&el.second);
+            auto& rc  = _item_rect.emplace_back();
+            auto& pos = _item_pos.emplace_back();
+            rc.width  = el.second._img.width + _padding * 2;
+            rc.height = el.second._img.height + _padding * 2;
         }
 
-        stbrp_init_target(&_context, _width, _height, _nodes.data(), (int32_t)_nodes.size());
-        stbrp_setup_heuristic(&_context, _heuristic);
+        float occupancy = 0;
+        auto  ret       = maxRects(_width,
+                            _height,
+                            (int32_t)_item_rect.size(),
+                            _item_rect.data(),
+                            maxRectsFreeRectChoiceHeuristic(_heuristic),
+                            0,
+                            _item_pos.data(),
+                            &occupancy);
 
-        auto r = stbrp_pack_rects(&_context, _rects.data(), (int32_t)_rects.size());
-
-        _trimed_width = 0;
+        _trimed_width  = 0;
         _trimed_height = 0;
 
-        for (auto& el : _rects)
+        for (int32_t n = 0; n < (int32_t)_item_rect.size(); ++n)
         {
-            _sprites[el.id]->_region.x      = (float)el.x + _padding;
-            _sprites[el.id]->_region.y      = (float)el.y + _padding;
-            _sprites[el.id]->_region.width  = (float)_sprites[el.id]->_img.width;
-            _sprites[el.id]->_region.height = (float)_sprites[el.id]->_img.height;
-            _sprites[el.id]->_packed        = el.was_packed;
-            if (!_sprites[el.id]->_txt.id)
+            _sprites[n]->_packed        = _item_pos[n].used;
+            _sprites[n]->_region.x      = (float)_item_pos[n].left + _padding;
+            _sprites[n]->_region.y      = (float)_item_pos[n].top + _padding;
+            _sprites[n]->_region.width  = (float)_sprites[n]->_img.width;
+            _sprites[n]->_region.height = (float)_sprites[n]->_img.height;
+            if (!_sprites[n]->_txt.id)
             {
-                _sprites[el.id]->_txt = LoadTextureFromImage(_sprites[el.id]->_img);
+                _sprites[n]->_txt = LoadTextureFromImage(_sprites[n]->_img);
             }
-            if (_sprites[el.id]->_packed)
+            if (_sprites[n]->_packed)
             {
-                if (_trimed_width < _sprites[el.id]->_region.x + _sprites[el.id]->_region.width + _padding)
+                if (_trimed_width < _sprites[n]->_region.x + _sprites[n]->_region.width + _padding)
                 {
-                    _trimed_width = int32_t(_sprites[el.id]->_region.x + _sprites[el.id]->_region.width + _padding);
+                    _trimed_width = int32_t(_sprites[n]->_region.x + _sprites[n]->_region.width + _padding);
                 }
 
-                if (_trimed_height < _sprites[el.id]->_region.y + _sprites[el.id]->_region.height + _padding)
+                if (_trimed_height < _sprites[n]->_region.y + _sprites[n]->_region.height + _padding)
                 {
-                    _trimed_height = int32_t(_sprites[el.id]->_region.y + _sprites[el.id]->_region.height + _padding);
+                    _trimed_height = int32_t(_sprites[n]->_region.y + _sprites[n]->_region.height + _padding);
                 }
             }
         }
-
-        return r == 1;
+        return ret != -1;
     }
 
     void app::reset()
