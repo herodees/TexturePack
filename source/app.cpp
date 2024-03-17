@@ -149,9 +149,16 @@ namespace box
                     {
                         if (&el.second == _active)
                         {
-                            auto nodeHandler  = _items.extract(el.first);
-                            nodeHandler.key() = _active_name;
-                            _items.insert(std::move(nodeHandler));
+                            if (_items.end() == _items.find(_active_name))
+                            {
+                                auto nodeHandler  = _items.extract(el.first);
+                                nodeHandler.key() = _active_name;
+                                _items.insert(std::move(nodeHandler));
+                            }
+                            else
+                            {
+                                _active_name = el.first;
+                            }
                             break;
                         }
                     }
@@ -219,12 +226,14 @@ namespace box
 
         if (ImGui::BeginChildFrame(1, {-1, -1}))
         {
+            auto clr = ImGui::GetColorU32(ImGuiCol_Text);
             for (auto& spr : _items)
             {
+                ImGui::PushStyleColor(ImGuiCol_Text, spr.second._packed ? clr : 0xff0000ff);
+                _str.clear();
+                _str.append(" ").append(ICON_FA_FILE_IMAGE).append(" ").append(spr.first);
 
-                ImGui::PushStyleColor(ImGuiCol_Text, spr.second._packed ? 0xffffffff : 0xff0000ff);
-
-                if (ImGui::Selectable(spr.first.c_str(), _active == &spr.second))
+                if (ImGui::Selectable(_str.c_str(), _active == &spr.second))
                 {
                     _active      = &spr.second;
                     _active_name = spr.first;

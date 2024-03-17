@@ -59,8 +59,8 @@ namespace box
         bool                          _visible_region{true};
         bool                          _dirty{};
         std::string                   _path;
-
-        std::vector<maxRectsSize> _item_rect;
+        std::string                   _str;
+        std::vector<maxRectsSize>     _item_rect;
         std::vector<maxRectsPosition> _item_pos;
     };
 } // namespace box
