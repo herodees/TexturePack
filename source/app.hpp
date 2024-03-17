@@ -39,6 +39,9 @@ namespace box
         bool repack();
         void reset();
 
+        Image    load_cb64(msg::Var ar) const;
+        msg::Var save_cb64(Image img) const;
+
         std::map<std::string, sprite> _items;
         sprite*                       _active{};
         std::string                   _active_name;

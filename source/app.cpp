@@ -271,6 +271,10 @@ namespace box
         ImVec2 from = ImGui::GetWindowPos();
         ImVec2 size = ImGui::GetContentRegionAvail();
         ImVec2 txtsize((float)_width, (float)_height);
+        if (_trim)
+        {
+            txtsize = ImVec2((float)_trimed_width, (float)_trimed_height);
+        }
         ImVec2 halftxt(txtsize * zoom / ImVec2(2, 2));
         ImVec2 center(from + size / ImVec2(2, 2));
         ImVec2 origin(center - halftxt);
@@ -303,7 +307,7 @@ namespace box
             }
             if (_visible_origin)
             {
-                ImVec2 oo = origin + (pos1 + ImVec2(el.second._ox, el.second._oy)) * zoom;
+                ImVec2 oo = origin + (pos1 + ImVec2((float)el.second._ox, (float)el.second._oy)) * zoom;
                 dc->AddLine(oo - ImVec2(0, 10), oo + ImVec2(0, 10), flclr);
                 dc->AddLine(oo - ImVec2(10, 0), oo + ImVec2(10, 0), flclr);
             }
@@ -318,7 +322,7 @@ namespace box
 
             dc->AddRect(origin + pos1 * zoom, origin + pos2 * zoom, flclr);
 
-            ImVec2 oo = origin + (pos1 + ImVec2(_active->_ox, _active->_oy)) * zoom;
+            ImVec2 oo = origin + (pos1 + ImVec2((float)_active->_ox, (float)_active->_oy)) * zoom;
 
             dc->AddLine(oo - ImVec2(0, 10), oo + ImVec2(0, 10), flclr);
             dc->AddLine(oo - ImVec2(10, 0), oo + ImVec2(10, 0), flclr);
@@ -346,6 +350,8 @@ namespace box
         msg::Var texture  = doc.get_item("texture");
         msg::Var metadata = doc.get_item("metadata");
 
+        _trimed_width = 0;
+        _trimed_height = 0;
         _width     = metadata.get_item("width").get(_width);
         _height    = metadata.get_item("height").get(_height);
         _padding   = metadata.get_item("padding").get(_padding);
@@ -353,20 +359,10 @@ namespace box
         _heuristic = metadata.get_item("heuristics").get(_heuristic);
 
         Image img{};
-        auto  dta = texture.get_item("data");
-        _embed    = dta.is_string();
-
+        _embed = texture.get_item("data").is_string();
         if (_embed)
         {
-            int  b64size  = 0;
-            auto b64data  = DecodeDataBase64((const unsigned char*)dta.c_str(), &b64size);
-            int  datasize = 0;
-            img.data      = DecompressData(b64data, b64size, &datasize);
-            img.width     = texture.get_item("width").get(0);
-            img.height    = texture.get_item("height").get(0);
-            img.mipmaps   = 1;
-            img.format    = RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-            MemFree(b64data);
+            img = load_cb64(texture);
         }
         else
         {
@@ -390,19 +386,19 @@ namespace box
             auto dta           = el.get_item("img");
             if (dta.is_object())
             {
-                int  b64size     = 0;
-                auto b64data     = DecodeDataBase64((const unsigned char*)dta.get_item("d").c_str(), &b64size);
-                int  datasize    = 0;
-                itm._img.data    = DecompressData(b64data, b64size, &datasize);
-                itm._img.width   = dta.get_item("w").get(0);
-                itm._img.height  = dta.get_item("h").get(0);
-                itm._img.format  = dta.get_item("f").get(0);
-                itm._img.mipmaps = dta.get_item("m").get(1);
-                MemFree(b64data);
+                itm._img = load_cb64(dta);
             }
             else
             {
                 itm._img = ImageFromImage(img, itm._region);
+                if (_trimed_width < itm._region.x + itm._region.width + _padding)
+                {
+                    _trimed_width = itm._region.x + itm._region.width + _padding;
+                }
+                if (_trimed_height < itm._region.y + itm._region.height + _padding)
+                {
+                    _trimed_height = itm._region.y + itm._region.height + _padding;
+                }
             }
         }
 
@@ -422,7 +418,12 @@ namespace box
         metadata.set_item("trim_alpha", _trim);
         metadata.set_item("heuristics", _heuristic);
 
-        auto image = GenImageColor(_width, _height, {});
+        Image image{};
+        if (_trim)
+            image = GenImageColor(_trimed_width, _trimed_height, {});
+        else
+            image = GenImageColor(_width, _height, {});
+
         for (auto& itm : _items)
         {
             msg::Var spr;
@@ -440,20 +441,7 @@ namespace box
             }
             else
             {
-                int dataSize = GetPixelDataSize(itm.second._img.width, itm.second._img.height, itm.second._img.format);
-                int compSize = 0;
-                auto*    cmpdata = CompressData((unsigned char*)itm.second._img.data, dataSize, &compSize);
-                int      b64size = 0;
-                auto*    b64data = EncodeDataBase64(cmpdata, compSize, &b64size);
-                msg::Var img;
-                img.set_item("w", itm.second._img.width);
-                img.set_item("h", itm.second._img.height);
-                img.set_item("f", itm.second._img.format);
-                img.set_item("m", itm.second._img.mipmaps);
-                img.set_item("d", std::string_view(b64data, b64size));
-                spr.set_item("img", img);
-                MemFree(cmpdata);
-                MemFree(b64data);
+                spr.set_item("img", save_cb64(itm.second._img));
             }
 
             spr.set_item("w", itm.second._region.width);
@@ -469,18 +457,10 @@ namespace box
         }
 
         auto r = false;
-        texture.set_item("width", image.width);
-        texture.set_item("height", image.height);
+
         if (_embed)
         {
-            int   dataSize = GetPixelDataSize(image.width, image.height, image.format);
-            int   compSize = 0;
-            auto* cmpdata  = CompressData((unsigned char*)image.data, dataSize, &compSize);
-            int   b64size  = 0;
-            auto* b64data  = EncodeDataBase64(cmpdata, compSize, &b64size);
-            texture.set_item("data", std::string_view(b64data, b64size));
-            MemFree(cmpdata);
-            MemFree(b64data);
+            texture = save_cb64(image);
         }
         else
         {
@@ -490,6 +470,8 @@ namespace box
             txtpath.append("/").append(texturename);
             r = ExportImage(image, txtpath.c_str());
             texture.set_item("file", std::string_view(texturename));
+            texture.set_item("width", image.width);
+            texture.set_item("height", image.height);
         }
 
         doc.set_item("items", sprites);
@@ -588,6 +570,9 @@ namespace box
 
         auto r = stbrp_pack_rects(&_context, _rects.data(), (int32_t)_rects.size());
 
+        _trimed_width = 0;
+        _trimed_height = 0;
+
         for (auto& el : _rects)
         {
             _sprites[el.id]->_region.x      = (float)el.x + _padding;
@@ -598,6 +583,18 @@ namespace box
             if (!_sprites[el.id]->_txt.id)
             {
                 _sprites[el.id]->_txt = LoadTextureFromImage(_sprites[el.id]->_img);
+            }
+            if (_sprites[el.id]->_packed)
+            {
+                if (_trimed_width < _sprites[el.id]->_region.x + _sprites[el.id]->_region.width + _padding)
+                {
+                    _trimed_width = int32_t(_sprites[el.id]->_region.x + _sprites[el.id]->_region.width + _padding);
+                }
+
+                if (_trimed_height < _sprites[el.id]->_region.y + _sprites[el.id]->_region.height + _padding)
+                {
+                    _trimed_height = int32_t(_sprites[el.id]->_region.y + _sprites[el.id]->_region.height + _padding);
+                }
             }
         }
 
@@ -622,4 +619,42 @@ namespace box
         _trim      = {};
         _dirty     = true;
     }
+
+    Image app::load_cb64(msg::Var ar) const
+    {
+        Image   out{};
+        int32_t b64size  = 0;
+        auto    b64data  = DecodeDataBase64((const unsigned char*)ar.get_item("data").c_str(), &b64size);
+        int32_t datasize = 0;
+        out.data         = DecompressData(b64data, b64size, &datasize);
+        out.width        = ar.get_item("width").get(0);
+        out.height       = ar.get_item("height").get(0);
+        out.format       = ar.get_item("format").get(0);
+        out.mipmaps      = 1;
+        MemFree(b64data);
+        return out;
+    }
+
+    msg::Var app::save_cb64(Image image) const
+    {
+        msg::Var out;
+
+        int32_t dataSize = GetPixelDataSize(image.width, image.height, image.format);
+        int32_t compSize = 0;
+        auto*   cmpdata  = CompressData((unsigned char*)image.data, dataSize, &compSize);
+        int32_t b64size  = 0;
+        auto*   b64data  = EncodeDataBase64(cmpdata, compSize, &b64size);
+
+        out.set_item("width", image.width);
+        out.set_item("height", image.height);
+        out.set_item("format", image.format);
+        out.set_item("data", std::string_view(b64data, b64size));
+
+        MemFree(cmpdata);
+        MemFree(b64data);
+
+        return out;
+    }
+
+
 } // namespace box
