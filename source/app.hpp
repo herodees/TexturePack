@@ -35,6 +35,7 @@ namespace box
         bool add_file(const char* path);
         bool add_files();
         bool remove_file(sprite* spr);
+        bool set_origin(sprite* spr, ImVec2 off) const;
         bool repack();
         void reset();
 

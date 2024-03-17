@@ -151,6 +151,34 @@ namespace box
                     _active->_ox = val[0];
                     _active->_oy = val[1];
                 }
+
+                ImGui::Text("Align");
+                if (ImGui::Button("o##tl", {20, 0}))
+                    set_origin(_active, {0.f, 0.f});
+                ImGui::SameLine();
+                if (ImGui::Button("o##t", {20, 0}))
+                    set_origin(_active, {0.5f, 0.f});
+                ImGui::SameLine();
+                if (ImGui::Button("o##tr", {20, 0}))
+                    set_origin(_active, {1.0f, 0.f});
+
+                if (ImGui::Button("o##ml", {20, 0}))
+                    set_origin(_active, {0.0f, 0.5f});
+                ImGui::SameLine();
+                if (ImGui::Button("o##m", {20, 0}))
+                    set_origin(_active, {0.5f, 0.5f});
+                ImGui::SameLine();
+                if (ImGui::Button("o##mr", {20, 0}))
+                    set_origin(_active, {1.0f, 0.5f});
+
+                if (ImGui::Button("o##bl", {20, 0}))
+                    set_origin(_active, {0.0f, 1.f});
+                ImGui::SameLine();
+                if (ImGui::Button("o##b", {20, 0}))
+                    set_origin(_active, {0.5f, 1.f});
+                ImGui::SameLine();
+                if (ImGui::Button("o##br", {20, 0}))
+                    set_origin(_active, {1.0f, 1.f});
             }
         }
         ImGui::EndChildFrame();
@@ -358,7 +386,7 @@ namespace box
             itm._region.width  = (float)el.get_item("w").get(0);
             itm._region.height = (float)el.get_item("h").get(0);
             itm._ox            = el.get_item("ox").get(0);
-            itm._ox            = el.get_item("oy").get(0);
+            itm._oy            = el.get_item("oy").get(0);
             auto dta           = el.get_item("img");
             if (dta.is_object())
             {
@@ -532,6 +560,13 @@ namespace box
                 return true;
             }
         }
+        return false;
+    }
+
+    bool app::set_origin(sprite* spr, ImVec2 off) const
+    {
+        spr->_ox = int32_t(spr->_region.width * off.x);
+        spr->_oy = int32_t(spr->_region.height * off.y);
         return false;
     }
 
