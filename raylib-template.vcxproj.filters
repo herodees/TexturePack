@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_demo.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_stdlib.cpp" />
+    <ClCompile Include="imgui\imgui_tables.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
+    <ClCompile Include="rlimgui\rlImGui.cpp" />
+    <ClCompile Include="source\app.cpp" />
+    <ClCompile Include="tfd\tinyfiledialogs.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source\include.hpp" />
+    <ClInclude Include="source\utils\math.hpp" />
+    <ClInclude Include="source\utils\matrix2d.hpp" />
+    <ClInclude Include="source\utils\msgbuff.hpp" />
+    <ClInclude Include="source\utils\msgvar.hpp" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="imgui\imgui_stdlib.h" />
+    <ClInclude Include="imgui\imstb_rectpack.h" />
+    <ClInclude Include="imgui\imstb_textedit.h" />
+    <ClInclude Include="imgui\imstb_truetype.h" />
+    <ClInclude Include="rlimgui\FA6FreeSolidFontData.h" />
+    <ClInclude Include="rlimgui\IconsFontAwesome6.h" />
+    <ClInclude Include="rlimgui\imgui_impl_raylib.h" />
+    <ClInclude Include="rlimgui\rlImGui.h" />
+    <ClInclude Include="rlimgui\rlImGuiColors.h" />
+    <ClInclude Include="source\app.hpp" />
+    <ClInclude Include="tfd\tinyfiledialogs.h" />
+  </ItemGroup>
+</Project>
