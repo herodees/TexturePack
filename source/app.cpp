@@ -268,12 +268,17 @@ namespace box
             }
 
             dc->AddImage((ImTextureID)&el.second._txt, origin + pos1 * zoom, origin + pos2 * zoom);
-            dc->AddRect(origin + pos1 * zoom, origin + pos2 * zoom, clr);
-
-            ImVec2 oo = origin + (pos1 + ImVec2(el.second._ox, el.second._oy)) * zoom;
-
-            dc->AddLine(oo - ImVec2(0, 10), oo + ImVec2(0, 10), flclr);
-            dc->AddLine(oo - ImVec2(10, 0), oo + ImVec2(10, 0), flclr);
+            
+            if (_visible_region)
+            {
+                dc->AddRect(origin + pos1 * zoom, origin + pos2 * zoom, clr);
+            }
+            if (_visible_origin)
+            {
+                ImVec2 oo = origin + (pos1 + ImVec2(el.second._ox, el.second._oy)) * zoom;
+                dc->AddLine(oo - ImVec2(0, 10), oo + ImVec2(0, 10), flclr);
+                dc->AddLine(oo - ImVec2(10, 0), oo + ImVec2(10, 0), flclr);
+            }
         }
 
         dc->AddRect(origin, center + halftxt, bgclr);
@@ -295,6 +300,7 @@ namespace box
     bool app::open_atlas(const char* path)
     {
         reset();
+        _path = path;
 
         auto v = LoadFileText(path);
         if (!v)
@@ -520,6 +526,8 @@ namespace box
         {
             if (&el.second == spr)
             {
+                if (spr == _active)
+                    _active = nullptr;
                 _items.erase(el.first);
                 return true;
             }
