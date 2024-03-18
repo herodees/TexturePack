@@ -174,32 +174,41 @@ namespace box
                     _active->_oy = val[1];
                 }
 
+                float itemw = 30;
+                float offset = ImGui::GetContentRegionAvail().x / 2 - (itemw * 3) / 2;
+
                 ImGui::Text("Align");
-                if (ImGui::Button("o##tl", {20, 0}))
+                ImGui::Dummy({offset, 1});
+                ImGui::SameLine();
+                if (ImGui::Button(ICON_FA_CIRCLE "##tl", {itemw, 0}))
                     set_origin(_active, {0.f, 0.f});
                 ImGui::SameLine();
-                if (ImGui::Button("o##t", {20, 0}))
+                if (ImGui::Button(ICON_FA_CIRCLE "##t", {itemw, 0}))
                     set_origin(_active, {0.5f, 0.f});
                 ImGui::SameLine();
-                if (ImGui::Button("o##tr", {20, 0}))
+                if (ImGui::Button(ICON_FA_CIRCLE "##tr", {itemw, 0}))
                     set_origin(_active, {1.0f, 0.f});
 
-                if (ImGui::Button("o##ml", {20, 0}))
+                ImGui::Dummy({offset, 1});
+                ImGui::SameLine();
+                if (ImGui::Button(ICON_FA_CIRCLE "##ml", {itemw, 0}))
                     set_origin(_active, {0.0f, 0.5f});
                 ImGui::SameLine();
-                if (ImGui::Button("o##m", {20, 0}))
+                if (ImGui::Button(ICON_FA_CIRCLE "##m", {itemw, 0}))
                     set_origin(_active, {0.5f, 0.5f});
                 ImGui::SameLine();
-                if (ImGui::Button("o##mr", {20, 0}))
+                if (ImGui::Button(ICON_FA_CIRCLE "##mr", {itemw, 0}))
                     set_origin(_active, {1.0f, 0.5f});
 
-                if (ImGui::Button("o##bl", {20, 0}))
+                ImGui::Dummy({offset, 1});
+                ImGui::SameLine();
+                if (ImGui::Button(ICON_FA_CIRCLE "##bl", {itemw, 0}))
                     set_origin(_active, {0.0f, 1.f});
                 ImGui::SameLine();
-                if (ImGui::Button("o##b", {20, 0}))
+                if (ImGui::Button(ICON_FA_CIRCLE "##b", {itemw, 0}))
                     set_origin(_active, {0.5f, 1.f});
                 ImGui::SameLine();
-                if (ImGui::Button("o##br", {20, 0}))
+                if (ImGui::Button(ICON_FA_CIRCLE "##br", {itemw, 0}))
                     set_origin(_active, {1.0f, 1.f});
             }
         }
@@ -224,25 +233,37 @@ namespace box
             _dirty = true;
         }
 
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 15});
         if (ImGui::BeginChildFrame(1, {-1, -1}))
         {
+            ImVec2 ico(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
             auto clr = ImGui::GetColorU32(ImGuiCol_Text);
             for (auto& spr : _items)
             {
+                ImGui::PushID(&spr.second);
                 ImGui::PushStyleColor(ImGuiCol_Text, spr.second._packed ? clr : 0xff0000ff);
-                _str.clear();
-                _str.append(" ").append(ICON_FA_FILE_IMAGE).append(" ").append(spr.first);
 
-                if (ImGui::Selectable(_str.c_str(), _active == &spr.second))
+                const int   maxsze = spr.second._txt.width > spr.second._txt.height ? spr.second._txt.width
+                                                                                    : spr.second._txt.height;
+                const float scle   = ico.x / maxsze;
+
+                if (ImGui::Selectable("##_", _active == &spr.second))
                 {
                     _active      = &spr.second;
                     _active_name = spr.first;
                 }
+                ImGui::SameLine();
+                ImGui::Image((ImTextureID)&spr.second._txt,
+                             ImVec2(scle * spr.second._txt.width, scle * spr.second._txt.height));
+                ImGui::SameLine(ico.x + 10);
+                ImGui::Text(spr.first.c_str());
 
                 ImGui::PopStyleColor();
+                ImGui::PopID();
             }
         }
         ImGui::EndChildFrame();
+        ImGui::PopStyleVar();
 
         ImGui::End();
     }
@@ -307,12 +328,18 @@ namespace box
         {
             mpos = {NAN, NAN};
         }
+        else
+        {
+            if (IsMouseButtonPressed(0))
+                _active = nullptr;
+        }
 
         for (auto& el : _items)
         {
             if (!el.second._packed)
                 continue;
 
+            const uint32_t al = _active == nullptr || _active == &el.second ? 0xffffffff : 0x5fffffff;
             ImVec2 pos1(el.second._region.x, el.second._region.y);
             ImVec2 pos2(el.second._region.x + el.second._region.width, el.second._region.y + el.second._region.height);
             auto   clr = bgclr;
@@ -327,7 +354,7 @@ namespace box
                 }
             }
 
-            dc->AddImage((ImTextureID)&el.second._txt, origin + pos1 * zoom, origin + pos2 * zoom);
+            dc->AddImage((ImTextureID)&el.second._txt, origin + pos1 * zoom, origin + pos2 * zoom, {0, 0}, {1, 1}, al);
             
             if (_visible_region)
             {
@@ -623,6 +650,7 @@ namespace box
             if (!_sprites[n]->_txt.id)
             {
                 _sprites[n]->_txt = LoadTextureFromImage(_sprites[n]->_img);
+                SetTextureFilter(_sprites[n]->_txt, RL_TEXTURE_FILTER_BILINEAR);
             }
             if (_sprites[n]->_packed)
             {
