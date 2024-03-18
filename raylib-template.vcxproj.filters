@@ -12,6 +12,7 @@
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="tfd\tinyfiledialogs.c" />
     <ClCompile Include="rbp\maxrects.c" />
+    <ClCompile Include="source\utils\theme.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\include.hpp" />
@@ -34,5 +35,8 @@
     <ClInclude Include="source\app.hpp" />
     <ClInclude Include="tfd\tinyfiledialogs.h" />
     <ClInclude Include="rbp\maxrects.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="source\rc\Resource.rc" />
   </ItemGroup>
 </Project>

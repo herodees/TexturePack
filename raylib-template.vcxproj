@@ -29,6 +29,7 @@
     <ClCompile Include="rlimgui\rlImGui.cpp" />
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="source\utils\theme.cpp" />
     <ClCompile Include="tfd\tinyfiledialogs.c" />
   </ItemGroup>
   <ItemGroup>
@@ -52,6 +53,9 @@
     <ClInclude Include="source\utils\msgbuff.hpp" />
     <ClInclude Include="source\utils\msgvar.hpp" />
     <ClInclude Include="tfd\tinyfiledialogs.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="source\rc\Resource.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

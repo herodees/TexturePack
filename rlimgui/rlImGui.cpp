@@ -425,7 +425,10 @@ void rlImGuiBeginInitImGui(void)
     SetupKeymap();
 
 	ImGuiIO& io = ImGui::GetIO();
-	io.Fonts->AddFontDefault();
+//	io.Fonts->AddFontDefault();
+    io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\tahoma.ttf", 17.0f);
+
+
 }
 
 void rlImGuiSetup(bool dark)

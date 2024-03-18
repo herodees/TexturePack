@@ -4,6 +4,7 @@
 
 void ShowDock(box::app&);
 void InitTheme(bool dark_theme);
+bool EnableDarkTheme(size_t wnd);
 
 int  main(int argc, char* argv[])
 {
@@ -13,7 +14,7 @@ int  main(int argc, char* argv[])
     int screenHeight = 800;
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(screenWidth, screenHeight, "Texture Packer");
+    InitWindow(screenWidth, screenHeight, "BOX TexturePacker");
     SetTargetFPS(144);
     rlImGuiSetup(true);
     InitTheme(true);
@@ -32,8 +33,8 @@ int  main(int argc, char* argv[])
         rlImGuiBegin();
 
         // show ImGui Content
-        bool open = true;
-        //       ImGui::ShowDemoWindow(&open);
+        //bool open = true;
+       //        ImGui::ShowDemoWindow(&open);
 
         ShowDock(_app);
 
@@ -111,6 +112,12 @@ void InitTheme(bool dark_theme)
 {
     rlImGuiSetup(dark_theme);
 
+    EnableDarkTheme((size_t)GetWindowHandle());
+
+    Image ico = GenImageColor(16, 16, {255,255,255,50});
+    SetWindowIcon(ico);
+    UnloadImage(ico);
+
     ImGui::GetIO().IniFilename = nullptr;
 
     // Cherry style from ImThemes
@@ -161,7 +168,7 @@ void InitTheme(bool dark_theme)
     colors[ImGuiCol_TitleBg]               = ImVec4(0.20f, 0.07f, 0.20f, 1.00f);
     colors[ImGuiCol_TitleBgActive]         = ImVec4(0.44f, 0.14f, 0.26f, 0.97f);
     colors[ImGuiCol_TitleBgCollapsed]      = ImVec4(0.20f, 0.22f, 0.27f, 0.75f);
-    colors[ImGuiCol_MenuBarBg]             = ImVec4(0.20f, 0.22f, 0.27f, 0.47f);
+    colors[ImGuiCol_MenuBarBg]             = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
     colors[ImGuiCol_ScrollbarBg]           = ImVec4(0.20f, 0.22f, 0.27f, 1.00f);
     colors[ImGuiCol_ScrollbarGrab]         = ImVec4(0.09f, 0.15f, 0.16f, 1.00f);
     colors[ImGuiCol_ScrollbarGrabHovered]  = ImVec4(0.45f, 0.20f, 0.30f, 0.78f);
