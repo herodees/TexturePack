@@ -1,6 +1,6 @@
 # Texture Packer
 
-![Screenshot](app.jpg)
+![Screenshot](app.png)
 
 ### Building from command line
 You don't have to open VS to build the project. Just run `msbuild raylib-template.sln`.\

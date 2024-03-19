@@ -19,7 +19,7 @@ namespace box
     {
     public:
         app();
-        ~app() = default;
+        ~app();
 
         void show();
         void show_menu();
@@ -27,7 +27,7 @@ namespace box
         void show_properties();
         void show_list();
         void show_texture();
-        void show_atlas();
+        void show_canvas(matrix2d& transform);
 
         bool open_atlas(const char* path);
         bool save_atlas(const char* path);
@@ -38,6 +38,8 @@ namespace box
         bool repack();
         void reset();
 
+        void set_atlas_scale(const ImVec2& scale, const ImVec2& world_point);
+
         Image    load_cb64(msg::Var ar) const;
         msg::Var save_cb64(Image img) const;
 
@@ -46,6 +48,8 @@ namespace box
         std::string                   _active_name;
         std::vector<sprite*>          _sprites;
         float                         _zoom{1.0f};
+        float                         _ideal_zoom{1.0f};
+        Vector2                       _ideal_offset;
         int32_t                       _heuristic{};
         int32_t                       _padding{};
         int32_t                       _spacing{};
@@ -62,5 +66,8 @@ namespace box
         std::string                   _str;
         std::vector<maxRectsSize>     _item_rect;
         std::vector<maxRectsPosition> _item_pos;
+        matrix2d                      _transform;
+        Vector2                       _mouse{NAN,NAN};
+        Texture                       _alpha_txt{};
     };
 } // namespace box

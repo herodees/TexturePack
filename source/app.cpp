@@ -4,6 +4,16 @@ namespace box
 {
     app::app()
     {
+        auto img = GenImageColor(2, 2, WHITE);
+        ImageDrawPixel(&img, 0, 0, BLACK);
+        ImageDrawPixel(&img, 1, 1, BLACK);
+        _alpha_txt = LoadTextureFromImage(img);
+        UnloadImage(img);
+    }
+
+    app::~app()
+    {
+        UnloadTexture(_alpha_txt);
     }
 
     void app::show()
@@ -272,12 +282,26 @@ namespace box
     {
         if (ImGui::Begin("Texture", 0, ImGuiWindowFlags_NoScrollWithMouse))
         {
-            ImGui::SetNextItemWidth(300);
-            ImGui::SliderFloat("##zm", &_zoom, 0.1f, 5.f);
+            ImGui::SetNextItemWidth(200);
+            if (ImGui::SliderFloat("##zm", &_zoom, 0.1f, 5.f))
+            {
+                set_atlas_scale({_zoom, _zoom}, {0,0});
+            }
             ImGui::SameLine();
-            ImGui::Button(ICON_FA_EXPAND);
+            if (ImGui::Button(ICON_FA_EXPAND))
+            {
+                _zoom = 1.f;
+                _transform.reset();
+            }
             ImGui::SameLine();
-            ImGui::Button(ICON_FA_COMPRESS);
+            if (ImGui::Button(ICON_FA_COMPRESS))
+            {
+                _zoom = _ideal_zoom;
+                _transform.reset();
+                _transform.scale(_zoom, _zoom);
+                _transform.tx = _ideal_offset.x;
+                _transform.ty = _ideal_offset.y;
+            }
 
             ImGui::SameLine();
             ImGui::Checkbox("Show origin", &_visible_origin);
@@ -289,15 +313,7 @@ namespace box
 
             if (ImGui::BeginChild(10, {-1, -1}, 0, ImGuiWindowFlags_NoScrollWithMouse))
             {
-
-                show_atlas();
-
-                if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows))
-                {
-                    _zoom += ImGui::GetIO().MouseWheel * 0.1f;
-                    if (_zoom < 0.1f)
-                        _zoom = 0.1f;
-                }
+                show_canvas(_transform);
             }
             ImGui::EndChild();
 
@@ -307,81 +323,94 @@ namespace box
         ImGui::End();
     }
 
-    void app::show_atlas()
+    void app::show_canvas(matrix2d& transform)
     {
-        auto   flclr = ImGui::GetColorU32(ImGuiCol_DragDropTarget);
-        auto   bgclr = ImGui::GetColorU32(ImGuiCol_NavHighlight);
-        auto   dc    = ImGui::GetWindowDrawList();
-        ImVec2 zoom(_zoom, _zoom);
+
+
+        ImVec2 txtsize(!_trim ? (float)_width : (float)_trimed_width, !_trim ? (float)_height : (float)_trimed_height);
         ImVec2 from = ImGui::GetWindowPos();
         ImVec2 size = ImGui::GetContentRegionAvail();
-        ImVec2 txtsize((float)_width, (float)_height);
-        if (_trim)
-        {
-            txtsize = ImVec2((float)_trimed_width, (float)_trimed_height);
-        }
-        ImVec2 halftxt(txtsize * zoom / ImVec2(2, 2));
-        ImVec2 center(from + size / ImVec2(2, 2));
-        ImVec2 origin(center - halftxt);
-        ImVec2 mpos = (ImGui::GetMousePos() - origin) / zoom;
+
+        matrix2d local({from.x, from.y}, {1.f, 1.f}, {(size.x - txtsize.x) / -2, (size.y - txtsize.y) / -2}, 0);
+
+        auto iz         = size / txtsize;
+        _ideal_zoom     = iz.x < iz.y ? iz.x : iz.y;
+        _ideal_offset.x = (size.x - txtsize.x) / -2;
+        _ideal_offset.y = (size.y - txtsize.y) / -2;
+
+        local = local * transform;
         if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows))
-        {
-            mpos = {NAN, NAN};
-        }
+            _mouse = {NAN, NAN};
         else
-        {
-            if (IsMouseButtonPressed(0))
-                _active = nullptr;
-        }
+            _mouse = local.inverseTransformPoint(GetMousePosition());
 
-        for (auto& el : _items)
+        auto flclr = ImGui::GetColorU32(ImGuiCol_DragDropTarget);
+        auto bgclr = ImGui::GetColorU32(ImGuiCol_NavHighlight);
+        auto dc    = ImGui::GetWindowDrawList();
+        bool hover = false;
+        dc->Flags  = ImDrawListFlags_None;
+
+        //dc->AddRectFilled(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x1fffffff);
+        dc->AddImage((ImTextureID)&_alpha_txt,
+                     local.transformPoint(ImVec2()),
+                     local.transformPoint(txtsize),
+                     {0, 0},
+                     {txtsize.x / 16.f, txtsize.y / 16.f},
+                     0x3fffffff);
+        dc->AddRect(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x5fffffff);
+
+        for (auto& spr : _items)
         {
-            if (!el.second._packed)
+            if (!spr.second._packed)
                 continue;
+            bool isactive = _active == nullptr || _active == &spr.second;
 
-            const uint32_t al = _active == nullptr || _active == &el.second ? 0xffffffff : 0x5fffffff;
-            ImVec2 pos1(el.second._region.x, el.second._region.y);
-            ImVec2 pos2(el.second._region.x + el.second._region.width, el.second._region.y + el.second._region.height);
-            auto   clr = bgclr;
+            const uint32_t al = isactive ? 0xffffffff : 0x5fffffff;
+            ImVec2 p1(spr.second._region.x, spr.second._region.y);
+            ImVec2 p2(spr.second._region.x + spr.second._region.width, spr.second._region.y + spr.second._region.height);
+            dc->AddImage((ImTextureID)&spr.second._txt,
+                         local.transformPoint(p1), local.transformPoint(p2),
+                         {0, 0},
+                         {1, 1},
+                         al);
 
-            if (mpos.x >= pos1.x && mpos.x < pos2.x && mpos.y >= pos1.y && mpos.y < pos2.y)
+            auto clr = bgclr;
+
+            if (_mouse.x >= p1.x && _mouse.x < p2.x && _mouse.y >= p1.y && _mouse.y < p2.y)
             {
+                hover = true;
                 clr = flclr;
                 if (IsMouseButtonPressed(0))
                 {
-                    _active = &el.second;
-                    _active_name = el.first;
+                    _active      = &spr.second;
+                    _active_name = spr.first;
                 }
             }
 
-            dc->AddImage((ImTextureID)&el.second._txt, origin + pos1 * zoom, origin + pos2 * zoom, {0, 0}, {1, 1}, al);
-            
-            if (_visible_region)
+            if (_visible_region || isactive)
             {
-                dc->AddRect(origin + pos1 * zoom, origin + pos2 * zoom, clr);
+                dc->AddRect(local.transformPoint(p1), local.transformPoint(p2), clr);
             }
-            if (_visible_origin)
+            if (_visible_origin || isactive)
             {
-                ImVec2 oo = origin + (pos1 + ImVec2((float)el.second._ox, (float)el.second._oy)) * zoom;
-                dc->AddLine(oo - ImVec2(0, 10), oo + ImVec2(0, 10), flclr);
-                dc->AddLine(oo - ImVec2(10, 0), oo + ImVec2(10, 0), flclr);
+                auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._ox), float(spr.second._oy)});
+                dc->AddLine(origin - ImVec2(0, 10), origin + ImVec2(0, 10), flclr);
+                dc->AddLine(origin - ImVec2(10, 0), origin + ImVec2(10, 0), flclr);
             }
         }
 
-        dc->AddRect(origin, center + halftxt, bgclr);
-
-        if (_active && _active->_packed)
+        if (!isnan(_mouse.x) && !isnan(_mouse.y) && ImGui::GetIO().MouseWheel)
         {
-            ImVec2 pos1(_active->_region.x, _active->_region.y);
-            ImVec2 pos2(_active->_region.x + _active->_region.width, _active->_region.y + _active->_region.height);
-
-            dc->AddRect(origin + pos1 * zoom, origin + pos2 * zoom, flclr);
-
-            ImVec2 oo = origin + (pos1 + ImVec2((float)_active->_ox, (float)_active->_oy)) * zoom;
-
-            dc->AddLine(oo - ImVec2(0, 10), oo + ImVec2(0, 10), flclr);
-            dc->AddLine(oo - ImVec2(10, 0), oo + ImVec2(10, 0), flclr);
+            _zoom += ImGui::GetIO().MouseWheel * 0.1f;
+            if (_zoom < 0.1f)
+                _zoom = 0.1f;
+            set_atlas_scale({_zoom, _zoom}, {_mouse.x, _mouse.y});
         }
+        else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0))
+        {
+            _active = nullptr;
+        }
+
     }
 
     bool app::open_atlas(const char* path)
@@ -650,7 +679,8 @@ namespace box
             if (!_sprites[n]->_txt.id)
             {
                 _sprites[n]->_txt = LoadTextureFromImage(_sprites[n]->_img);
-                SetTextureFilter(_sprites[n]->_txt, RL_TEXTURE_FILTER_BILINEAR);
+              
+                //  SetTextureFilter(_sprites[n]->_txt, RL_TEXTURE_FILTER_BILINEAR);
             }
             if (_sprites[n]->_packed)
             {
@@ -688,6 +718,16 @@ namespace box
         _height    = {512};
         _trim      = {};
         _dirty     = true;
+    }
+
+    void app::set_atlas_scale(const ImVec2& scale, const ImVec2& world_point)
+    {
+        matrix2d new_transform({0, 0}, {scale.x, scale.y}, {0, 0}, 0);
+        auto s = _transform.transformPoint(world_point);
+        auto c = s - new_transform.transformPoint(world_point);
+        new_transform.tx = c.x;
+        new_transform.ty = c.y;
+        _transform = new_transform;
     }
 
     Image app::load_cb64(msg::Var ar) const
