@@ -9,9 +9,12 @@ namespace box
         Image     _img{};
         Texture   _txt{};
         Rectangle _region{};
+        int32_t   _oxa{};
+        int32_t   _oya{};
+        int32_t   _oxb{};
+        int32_t   _oyb{};
+        int32_t   _data{};
         bool      _packed{};
-        int32_t   _ox{};
-        int32_t   _oy{};
 	};
 
 
@@ -45,11 +48,14 @@ namespace box
 
         std::map<std::string, sprite> _items;
         sprite*                       _active{};
+        sprite*                       _drag_origin{};
+        point2f                       _drag_begin;
+        bool                          _hovered_active{};
         std::string                   _active_name;
         std::vector<sprite*>          _sprites;
         float                         _zoom{1.0f};
         float                         _ideal_zoom{1.0f};
-        Vector2                       _ideal_offset;
+        point2f                       _ideal_offset;
         int32_t                       _heuristic{};
         int32_t                       _padding{};
         int32_t                       _spacing{};
@@ -67,7 +73,7 @@ namespace box
         std::vector<maxRectsSize>     _item_rect;
         std::vector<maxRectsPosition> _item_pos;
         matrix2d                      _transform;
-        Vector2                       _mouse{NAN,NAN};
+        point2f                       _mouse{NAN, NAN};
         Texture                       _alpha_txt{};
     };
 } // namespace box

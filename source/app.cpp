@@ -174,52 +174,85 @@ namespace box
                     }
                 }
 
-                val[0] = _active->_ox;
-                val[1] = _active->_oy;
-                ImGui::Text("Origin");
+                ImGui::Text("Aditional data");
                 ImGui::SetNextItemWidth(-1);
-                if (ImGui::InputInt2("##so", val))
+                const char* options =
+                    "Origin\0"
+                    "9 Patch\0";
+                ImGui::Combo("##ad", &_active->_data, options);
+
+                if (ImGui::BeginChildFrame(1, {-1, -1}))
                 {
-                    _active->_ox = val[0];
-                    _active->_oy = val[1];
+                    if (_active->_data == 0)
+                    {
+                        val[0] = _active->_oxa;
+                        val[1] = _active->_oya;
+                        ImGui::Text("Origin");
+                        ImGui::SetNextItemWidth(-1);
+                        if (ImGui::InputInt2("##so", val))
+                        {
+                            _active->_oxa = val[0];
+                            _active->_oya = val[1];
+                        }
+
+                        float itemw  = 30;
+                        float offset = ImGui::GetContentRegionAvail().x / 2 - (itemw * 3) / 2;
+
+                        ImGui::Text("Align");
+                        ImGui::Dummy({offset, 1});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##tl", {itemw, 0}))
+                            set_origin(_active, {0.f, 0.f});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##t", {itemw, 0}))
+                            set_origin(_active, {0.5f, 0.f});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##tr", {itemw, 0}))
+                            set_origin(_active, {1.0f, 0.f});
+
+                        ImGui::Dummy({offset, 1});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##ml", {itemw, 0}))
+                            set_origin(_active, {0.0f, 0.5f});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##m", {itemw, 0}))
+                            set_origin(_active, {0.5f, 0.5f});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##mr", {itemw, 0}))
+                            set_origin(_active, {1.0f, 0.5f});
+
+                        ImGui::Dummy({offset, 1});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##bl", {itemw, 0}))
+                            set_origin(_active, {0.0f, 1.f});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##b", {itemw, 0}))
+                            set_origin(_active, {0.5f, 1.f});
+                        ImGui::SameLine();
+                        if (ImGui::Button(ICON_FA_CIRCLE "##br", {itemw, 0}))
+                            set_origin(_active, {1.0f, 1.f});
+                    }
+
+                    if (_active->_data == 1)
+                    {
+                        ImGui::Text("Top");
+                        ImGui::SetNextItemWidth(-1);
+                        ImGui::InputInt("##to", &_active->_oya);
+
+                        ImGui::Text("Bottom");
+                        ImGui::SetNextItemWidth(-1);
+                        ImGui::InputInt("##bo", &_active->_oyb);
+
+                        ImGui::Text("Left");
+                        ImGui::SetNextItemWidth(-1);
+                        ImGui::InputInt("##lo", &_active->_oxa);
+
+                        ImGui::Text("Right");
+                        ImGui::SetNextItemWidth(-1);
+                        ImGui::InputInt("##ro", &_active->_oxb);
+                    }
                 }
-
-                float itemw = 30;
-                float offset = ImGui::GetContentRegionAvail().x / 2 - (itemw * 3) / 2;
-
-                ImGui::Text("Align");
-                ImGui::Dummy({offset, 1});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##tl", {itemw, 0}))
-                    set_origin(_active, {0.f, 0.f});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##t", {itemw, 0}))
-                    set_origin(_active, {0.5f, 0.f});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##tr", {itemw, 0}))
-                    set_origin(_active, {1.0f, 0.f});
-
-                ImGui::Dummy({offset, 1});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##ml", {itemw, 0}))
-                    set_origin(_active, {0.0f, 0.5f});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##m", {itemw, 0}))
-                    set_origin(_active, {0.5f, 0.5f});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##mr", {itemw, 0}))
-                    set_origin(_active, {1.0f, 0.5f});
-
-                ImGui::Dummy({offset, 1});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##bl", {itemw, 0}))
-                    set_origin(_active, {0.0f, 1.f});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##b", {itemw, 0}))
-                    set_origin(_active, {0.5f, 1.f});
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_CIRCLE "##br", {itemw, 0}))
-                    set_origin(_active, {1.0f, 1.f});
+                ImGui::EndChildFrame();
             }
         }
         ImGui::EndChildFrame();
@@ -325,8 +358,6 @@ namespace box
 
     void app::show_canvas(matrix2d& transform)
     {
-
-
         ImVec2 txtsize(!_trim ? (float)_width : (float)_trimed_width, !_trim ? (float)_height : (float)_trimed_height);
         ImVec2 from = ImGui::GetWindowPos();
         ImVec2 size = ImGui::GetContentRegionAvail();
@@ -380,22 +411,42 @@ namespace box
             {
                 hover = true;
                 clr = flclr;
-                if (IsMouseButtonPressed(0))
+                if (IsMouseButtonPressed(0) && !_hovered_active)
                 {
                     _active      = &spr.second;
                     _active_name = spr.first;
                 }
             }
 
-            if (_visible_region || isactive)
+            if (_visible_region || _active == &spr.second)
             {
                 dc->AddRect(local.transformPoint(p1), local.transformPoint(p2), clr);
             }
-            if (_visible_origin || isactive)
+            if (_visible_origin || _active == &spr.second)
             {
-                auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._ox), float(spr.second._oy)});
-                dc->AddLine(origin - ImVec2(0, 10), origin + ImVec2(0, 10), flclr);
-                dc->AddLine(origin - ImVec2(10, 0), origin + ImVec2(10, 0), flclr);
+                auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._oxa), float(spr.second._oya)});
+                origin -= ImVec2(1, 1);
+
+                clr = flclr;
+                if (_active == &spr.second)
+                {
+                    _hovered_active = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
+                                                           spr.second._region.y + spr.second._oya}) < pow2(6);
+                    if (_hovered_active)
+                    {
+                        clr = bgclr;
+                    }
+                }
+    
+                dc->AddLine(origin - ImVec2(0, 10), origin + ImVec2(0, 10), clr);
+                dc->AddLine(origin - ImVec2(10, 0), origin + ImVec2(10, 0), clr);
+                dc->AddRect(origin - ImVec2(3, 3), origin + ImVec2(4, 4), clr);
+            }
+
+            if (_active == &spr.second && _hovered_active && IsMouseButtonPressed(0))
+            {
+                _drag_origin = &spr.second;
+                _drag_begin  = {_drag_origin->_oxa, _drag_origin->_oya};
             }
         }
 
@@ -406,11 +457,21 @@ namespace box
                 _zoom = 0.1f;
             set_atlas_scale({_zoom, _zoom}, {_mouse.x, _mouse.y});
         }
-        else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0))
+        else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0) && !_drag_origin)
         {
             _active = nullptr;
         }
 
+        if (IsMouseButtonDown(0) && _drag_origin)
+        {
+            auto off = ImGui::GetMouseDragDelta(0);
+            _drag_origin->_oxa = int32_t(_drag_begin.x + off.x / _zoom);
+            _drag_origin->_oya = int32_t(_drag_begin.y + off.y / _zoom);
+        }
+        else
+        {
+            _drag_origin = nullptr;
+        }
     }
 
     bool app::open_atlas(const char* path)
@@ -466,8 +527,8 @@ namespace box
             itm._region.y      = (float)el.get_item("y").get(0);
             itm._region.width  = (float)el.get_item("w").get(0);
             itm._region.height = (float)el.get_item("h").get(0);
-            itm._ox            = el.get_item("ox").get(0);
-            itm._oy            = el.get_item("oy").get(0);
+            itm._oxa            = el.get_item("ox").get(0);
+            itm._oya            = el.get_item("oy").get(0);
             auto dta           = el.get_item("img");
             if (dta.is_object())
             {
@@ -535,13 +596,13 @@ namespace box
 
             spr.set_item("w", itm.second._region.width);
             spr.set_item("h", itm.second._region.height);
-            if (itm.second._ox)
+            if (itm.second._oxa)
             {
-                spr.set_item("ox", itm.second._ox);
+                spr.set_item("ox", itm.second._oxa);
             }
-            if (itm.second._oy)
+            if (itm.second._oya)
             {
-                spr.set_item("oy", itm.second._oy);
+                spr.set_item("oy", itm.second._oya);
             }
         }
 
@@ -636,8 +697,8 @@ namespace box
 
     bool app::set_origin(sprite* spr, ImVec2 off) const
     {
-        spr->_ox = int32_t(spr->_region.width * off.x);
-        spr->_oy = int32_t(spr->_region.height * off.y);
+        spr->_oxa = int32_t(spr->_region.width * off.x);
+        spr->_oya = int32_t(spr->_region.height * off.y);
         return false;
     }
 

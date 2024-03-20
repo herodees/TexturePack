@@ -114,10 +114,6 @@ void InitTheme(bool dark_theme)
 
     EnableDarkTheme((size_t)GetWindowHandle());
 
-    Image ico = GenImageColor(16, 16, {255,255,255,50});
-    SetWindowIcon(ico);
-    UnloadImage(ico);
-
     ImGui::GetIO().IniFilename = nullptr;
 
     // Cherry style from ImThemes
