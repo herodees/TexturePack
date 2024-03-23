@@ -33,8 +33,8 @@ int  main(int argc, char* argv[])
         rlImGuiBegin();
 
         // show ImGui Content
-        // bool open = true;
-        // ImGui::ShowDemoWindow(&open);
+         bool open = true;
+       //  ImGui::ShowDemoWindow(&open);
 
         ShowDock(_app);
 

@@ -95,169 +95,183 @@ namespace box
 
         if (ImGui::BeginChildFrame(1, {-1, -1}))
         {
-            int val[] = {_width, _height};
             if (ImGui::CollapsingHeader("Atlas", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                ImGui::Text("Texture size");
-                ImGui::SetNextItemWidth(-1);
-                if (ImGui::InputInt2("##ts", val))
-                {
-                    _width  = val[0] > 0 ? val[0] : 1;
-                    _height = val[1] ? val[1] : 1;
-                    _dirty  = true;
-                }
-
-                ImGui::Text("Padding");
-                ImGui::SetNextItemWidth(-1);
-                if (ImGui::InputInt("##pd", &_padding))
-                {
-                    _padding = _padding > 0 ? _padding : 0;
-                    _dirty   = true;
-                }
-
-                ImGui::Text("Spacing");
-                ImGui::SetNextItemWidth(-1);
-                if (ImGui::InputInt("##sp", &_spacing))
-                {
-                    _spacing = _spacing > 0 ? _spacing : 0;
-                    _dirty   = true;
-                }
-
-                ImGui::Text("Heuristics algorithm");
-                ImGui::SetNextItemWidth(-1);
-                const char* options = 
-                    "BestShortSideFit\0"
-                    "BestLongSideFit\0"
-                    "BestAreaFit\0"
-                    "BottomLeftRule\0"
-                    "ContactPointRule\0";
-
-
-                if (ImGui::Combo("##hr", &_heuristic, options))
-                {
-                    _dirty = true;
-                }
-
-                if (ImGui::Checkbox("Trim size", &_trim))
-                {
-                    _dirty = true;
-                }
-
-                if (ImGui::Checkbox("Embed texture", &_embed))
-                {
-                }
+                show_atlas_properties();
             }
 
             if (_active && ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                ImGui::Text("Name");
-                ImGui::SetNextItemWidth(-1);
-                ImGui::InputText("##sn", &_active_name);
-                if (ImGui::IsItemDeactivatedAfterEdit())
-                {
-                    for (auto& el : _items)
-                    {
-                        if (&el.second == _active)
-                        {
-                            if (_items.end() == _items.find(_active_name))
-                            {
-                                auto nodeHandler  = _items.extract(el.first);
-                                nodeHandler.key() = _active_name;
-                                _items.insert(std::move(nodeHandler));
-                            }
-                            else
-                            {
-                                _active_name = el.first;
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                ImGui::Text("Aditional data");
-                ImGui::SetNextItemWidth(-1);
-                const char* options =
-                    "Origin\0"
-                    "9 Patch\0";
-                ImGui::Combo("##ad", &_active->_data, options);
-
-                if (ImGui::BeginChildFrame(1, {-1, -1}))
-                {
-                    if (_active->_data == 0)
-                    {
-                        val[0] = _active->_oxa;
-                        val[1] = _active->_oya;
-                        ImGui::Text("Origin");
-                        ImGui::SetNextItemWidth(-1);
-                        if (ImGui::InputInt2("##so", val))
-                        {
-                            _active->_oxa = val[0];
-                            _active->_oya = val[1];
-                        }
-
-                        float itemw  = 30;
-                        float offset = ImGui::GetContentRegionAvail().x / 2 - (itemw * 3) / 2;
-
-                        ImGui::Text("Align");
-                        ImGui::Dummy({offset, 1});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##tl", {itemw, 0}))
-                            set_origin(_active, {0.f, 0.f});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##t", {itemw, 0}))
-                            set_origin(_active, {0.5f, 0.f});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##tr", {itemw, 0}))
-                            set_origin(_active, {1.0f, 0.f});
-
-                        ImGui::Dummy({offset, 1});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##ml", {itemw, 0}))
-                            set_origin(_active, {0.0f, 0.5f});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##m", {itemw, 0}))
-                            set_origin(_active, {0.5f, 0.5f});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##mr", {itemw, 0}))
-                            set_origin(_active, {1.0f, 0.5f});
-
-                        ImGui::Dummy({offset, 1});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##bl", {itemw, 0}))
-                            set_origin(_active, {0.0f, 1.f});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##b", {itemw, 0}))
-                            set_origin(_active, {0.5f, 1.f});
-                        ImGui::SameLine();
-                        if (ImGui::Button(ICON_FA_CIRCLE "##br", {itemw, 0}))
-                            set_origin(_active, {1.0f, 1.f});
-                    }
-
-                    if (_active->_data == 1)
-                    {
-                        ImGui::Text("Top");
-                        ImGui::SetNextItemWidth(-1);
-                        ImGui::InputInt("##to", &_active->_oya);
-
-                        ImGui::Text("Bottom");
-                        ImGui::SetNextItemWidth(-1);
-                        ImGui::InputInt("##bo", &_active->_oyb);
-
-                        ImGui::Text("Left");
-                        ImGui::SetNextItemWidth(-1);
-                        ImGui::InputInt("##lo", &_active->_oxa);
-
-                        ImGui::Text("Right");
-                        ImGui::SetNextItemWidth(-1);
-                        ImGui::InputInt("##ro", &_active->_oxb);
-                    }
-                }
-                ImGui::EndChildFrame();
+                show_sprite_properties();
             }
         }
         ImGui::EndChildFrame();
 
         ImGui::End();
+    }
+
+    void app::show_atlas_properties()
+    {
+        auto ItemLabel = [](const char* label)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text(label);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+        };
+
+        if (ImGui::BeginTable("##atlprop",
+                              2,
+                              ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY,
+                              {-1, 220}))
+        {
+            ItemLabel("Texture width");
+            if (ImGui::DragInt("##tsw", &_width))
+            {
+                _width = _width > 0 ? _width : 1;
+                _dirty  = true;
+            }
+
+            ItemLabel("Texture height");
+            if (ImGui::DragInt("##tsh", &_height))
+            {
+                _height = _height > 0 ? _height : 1;
+                _dirty = true;
+            }
+
+            ItemLabel("Padding");
+            if (ImGui::DragInt("##pd", &_padding))
+            {
+                _padding = _padding > 0 ? _padding : 0;
+                _dirty   = true;
+            }
+
+            ItemLabel("Spacing");
+            if (ImGui::DragInt("##sp", &_spacing))
+            {
+                _spacing = _spacing > 0 ? _spacing : 0;
+                _dirty   = true;
+            }
+
+
+            const char* options =
+                "BestShortSideFit\0"
+                "BestLongSideFit\0"
+                "BestAreaFit\0"
+                "BottomLeftRule\0"
+                "ContactPointRule\0";
+
+            ItemLabel("Packing algorithm");
+            if (ImGui::Combo("##hr", &_heuristic, options))
+            {
+                _dirty = true;
+            }
+
+            ItemLabel("Trim size");
+            if (ImGui::Checkbox("##trt", &_trim))
+            {
+                _dirty = true;
+            }
+
+            ItemLabel("Embed texture");
+            if (ImGui::Checkbox("##emb", &_embed))
+            {
+            }
+
+            ImGui::EndTable();
+        }
+    }
+
+    void app::show_sprite_properties()
+    {
+        auto ItemLabel = [](const char* label)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text(label);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+        };
+
+        if (ImGui::BeginTable("##sprprop",
+                              2,
+                              ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY))
+        {
+            ItemLabel("Name");
+            ImGui::InputText("##sn", &_active_name);
+            if (ImGui::IsItemDeactivatedAfterEdit())
+            {
+                for (auto& el : _items)
+                {
+                    if (&el.second == _active)
+                    {
+                        if (_items.end() == _items.find(_active_name))
+                        {
+                            auto nodeHandler  = _items.extract(el.first);
+                            nodeHandler.key() = _active_name;
+                            _items.insert(std::move(nodeHandler));
+                        }
+                        else
+                        {
+                            _active_name = el.first;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            ItemLabel("Data");
+            ImGui::SetNextItemWidth(-1);
+            const char* options =
+                "Origin\0"
+                "Two origins\0"
+                "9 Patch\0";
+            ImGui::Combo("##ad", &_active->_data, options);
+
+            // Basic origin
+            if (_active->_data == sprite_data::One)
+            {
+                ItemLabel("Origin X");
+                ImGui::DragInt("##sox", &_active->_oxa);
+                ItemLabel("Origin Y");
+                ImGui::DragInt("##soy", &_active->_oya);
+                ItemLabel("Align");
+                show_align(_active->_oxa, _active->_oya, _active->_region.width, _active->_region.height);
+            }
+            // Two origins / line
+            if (_active->_data == sprite_data::Two)
+            {
+                ItemLabel("Origin X1");
+                ImGui::DragInt("##sox1", &_active->_oxa);
+                ItemLabel("Origin Y1");
+                ImGui::DragInt("##soy1", &_active->_oya);
+                ItemLabel("Align");
+                show_align(_active->_oxa, _active->_oya, _active->_region.width, _active->_region.height);
+
+                ItemLabel("Origin X2");
+                ImGui::DragInt("##sox2", &_active->_oxb);
+                ItemLabel("Origin Y2");
+                ImGui::DragInt("##soy2", &_active->_oyb);
+                ItemLabel("Align");
+                show_align(_active->_oxb, _active->_oyb, _active->_region.width, _active->_region.height);
+            }
+            // Nine patch region
+            if (_active->_data == sprite_data::NinePatch)
+            {
+                ItemLabel("Top");
+                ImGui::DragInt("##soya", &_active->_oya);
+                ItemLabel("Bottom");
+                ImGui::DragInt("##soyb", &_active->_oyb);
+                ItemLabel("Left");
+                ImGui::DragInt("##soxa", &_active->_oxa);
+                ItemLabel("Right");
+                ImGui::DragInt("##soxb", &_active->_oxb);
+            }
+            ImGui::EndTable();
+        }
     }
 
     void app::show_list()
@@ -390,6 +404,13 @@ namespace box
                      0x3fffffff);
         dc->AddRect(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x5fffffff);
 
+        auto draw_origin = [dc](ImVec2 origin, uint32_t clr)
+            {
+            dc->AddLine(origin - ImVec2(0, 10), origin + ImVec2(0, 10), clr);
+            dc->AddLine(origin - ImVec2(10, 0), origin + ImVec2(10, 0), clr);
+            dc->AddRect(origin - ImVec2(3, 3), origin + ImVec2(4, 4), clr);
+            };
+
         for (auto& spr : _items)
         {
             if (!spr.second._packed)
@@ -411,7 +432,7 @@ namespace box
             {
                 hover = true;
                 clr = flclr;
-                if (IsMouseButtonPressed(0) && !_hovered_active)
+                if (IsMouseButtonPressed(0) && !_drag._hovered_active[0] && !_drag._hovered_active[1])
                 {
                     _active      = &spr.second;
                     _active_name = spr.first;
@@ -426,27 +447,59 @@ namespace box
             {
                 auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._oxa), float(spr.second._oya)});
                 origin -= ImVec2(1, 1);
+                auto origin2 = local.transformPoint(p1 + ImVec2{float(spr.second._oxb), float(spr.second._oyb)});
+                origin2 -= ImVec2(1, 1);
 
                 clr = flclr;
                 if (_active == &spr.second)
                 {
-                    _hovered_active = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
-                                                           spr.second._region.y + spr.second._oya}) < pow2(6);
-                    if (_hovered_active)
+                    _drag._hovered_active[0] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
+                                                                    spr.second._region.y + spr.second._oya}) < pow2(6);
+
+                    _drag._hovered_active[1] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxb,
+                                                                    spr.second._region.y + spr.second._oyb}) < pow2(6);
+
+                    if (_drag._hovered_active[0] || _drag._hovered_active[1])
                     {
                         clr = bgclr;
                     }
                 }
     
-                dc->AddLine(origin - ImVec2(0, 10), origin + ImVec2(0, 10), clr);
-                dc->AddLine(origin - ImVec2(10, 0), origin + ImVec2(10, 0), clr);
-                dc->AddRect(origin - ImVec2(3, 3), origin + ImVec2(4, 4), clr);
+                if (spr.second._data == sprite_data::One)
+                {
+                    draw_origin(origin, clr);
+                }
+                if (spr.second._data == sprite_data::Two)
+                {
+                    draw_origin(origin, clr);
+                    draw_origin(origin2, clr);
+                    dc->AddLine(origin, origin2, clr);
+                }
+                if (spr.second._data == sprite_data::NinePatch)
+                {
+                    ImVec2 pp1 = local.transformPoint(p1 + ImVec2((float)spr.second._oxa, (float)spr.second._oya));
+                    ImVec2 pp2 = local.transformPoint(p1 + ImVec2((float)spr.second._oxb, (float)spr.second._oyb));
+
+                    dc->AddRect(pp1, pp2, clr);
+                    draw_origin(pp1, clr);
+                    draw_origin(pp2, clr);
+                }
             }
 
-            if (_active == &spr.second && _hovered_active && IsMouseButtonPressed(0))
+            if (_active == &spr.second && IsMouseButtonPressed(0))
             {
-                _drag_origin = &spr.second;
-                _drag_begin  = {_drag_origin->_oxa, _drag_origin->_oya};
+                if (_drag._hovered_active[0])
+                {
+                    _drag._drag_active[0] = true;
+                    _drag._drag_origin = &spr.second;
+                    _drag._drag_begin  = {_drag._drag_origin->_oxa, _drag._drag_origin->_oya};
+                }
+                else if (_drag._hovered_active[1])
+                {
+                    _drag._drag_active[1] = true;
+                    _drag._drag_origin = &spr.second;
+                    _drag._drag_begin  = {_drag._drag_origin->_oxb, _drag._drag_origin->_oyb};
+                }
             }
         }
 
@@ -457,21 +510,76 @@ namespace box
                 _zoom = 0.1f;
             set_atlas_scale({_zoom, _zoom}, {_mouse.x, _mouse.y});
         }
-        else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0) && !_drag_origin)
+        else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0) && !_drag._drag_origin)
         {
             _active = nullptr;
         }
 
-        if (IsMouseButtonDown(0) && _drag_origin)
+        if (IsMouseButtonDown(0) && (_drag._drag_active[0] || _drag._drag_active[1]))
         {
             auto off = ImGui::GetMouseDragDelta(0);
-            _drag_origin->_oxa = int32_t(_drag_begin.x + off.x / _zoom);
-            _drag_origin->_oya = int32_t(_drag_begin.y + off.y / _zoom);
+            ImGui::BeginTooltip();
+            if (_drag._drag_active[0])
+            {
+                _drag._drag_origin->_oxa = int32_t(_drag._drag_begin.x + off.x / _zoom);
+                _drag._drag_origin->_oya = int32_t(_drag._drag_begin.y + off.y / _zoom);
+                ImGui::Text("%d x %d", _drag._drag_origin->_oxa, _drag._drag_origin->_oya);
+            }
+            if (_drag._drag_active[1])
+            {
+                _drag._drag_origin->_oxb = int32_t(_drag._drag_begin.x + off.x / _zoom);
+                _drag._drag_origin->_oyb = int32_t(_drag._drag_begin.y + off.y / _zoom);
+                ImGui::Text("%d x %d", _drag._drag_origin->_oxb, _drag._drag_origin->_oyb);
+            }
+            ImGui::EndTooltip();
         }
         else
         {
-            _drag_origin = nullptr;
+            _drag._drag_active[0] = false;
+            _drag._drag_active[1] = false;
+            _drag._drag_origin = nullptr;
         }
+    }
+
+    bool app::show_align(int32_t& x, int32_t& y, float w, float h) const
+    {
+        float itemw  = 30;
+        float offset = ImGui::GetContentRegionAvail().x / 2 - (itemw * 3) / 2;
+
+        auto set_origin = [&x,&y, w, h](ImVec2 vec)
+            {
+            x = int32_t(w * vec.x);
+            y = int32_t(h * vec.y);
+            };
+
+        if (ImGui::Button(ICON_FA_CIRCLE "##tl", {itemw, 0}))
+            set_origin({0.f, 0.f});
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_CIRCLE "##t", {itemw, 0}))
+            set_origin({0.5f, 0.f});
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_CIRCLE "##tr", {itemw, 0}))
+            set_origin({1.0f, 0.f});
+
+
+        if (ImGui::Button(ICON_FA_CIRCLE "##ml", {itemw, 0}))
+            set_origin({0.0f, 0.5f});
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_CIRCLE "##m", {itemw, 0}))
+            set_origin({0.5f, 0.5f});
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_CIRCLE "##mr", {itemw, 0}))
+            set_origin({1.0f, 0.5f});
+
+        if (ImGui::Button(ICON_FA_CIRCLE "##bl", {itemw, 0}))
+            set_origin({0.0f, 1.f});
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_CIRCLE "##b", {itemw, 0}))
+            set_origin({0.5f, 1.f});
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_CIRCLE "##br", {itemw, 0}))
+            set_origin({1.0f, 1.f});
+        return false;
     }
 
     bool app::open_atlas(const char* path)
@@ -527,8 +635,11 @@ namespace box
             itm._region.y      = (float)el.get_item("y").get(0);
             itm._region.width  = (float)el.get_item("w").get(0);
             itm._region.height = (float)el.get_item("h").get(0);
-            itm._oxa            = el.get_item("ox").get(0);
-            itm._oya            = el.get_item("oy").get(0);
+            itm._data          = el.get_item("d").get(0);
+            itm._oxa           = el.get_item("oxa").get(0);
+            itm._oya           = el.get_item("oya").get(0);
+            itm._oxb           = el.get_item("oxb").get(0);
+            itm._oyb           = el.get_item("oyb").get(0);
             auto dta           = el.get_item("img");
             if (dta.is_object())
             {
@@ -596,13 +707,25 @@ namespace box
 
             spr.set_item("w", itm.second._region.width);
             spr.set_item("h", itm.second._region.height);
+            if (itm.second._data)
+            {
+                spr.set_item("d", itm.second._data);
+            }
             if (itm.second._oxa)
             {
-                spr.set_item("ox", itm.second._oxa);
+                spr.set_item("oxa", itm.second._oxa);
             }
             if (itm.second._oya)
             {
-                spr.set_item("oy", itm.second._oya);
+                spr.set_item("oya", itm.second._oya);
+            }
+            if (itm.second._oxb)
+            {
+                spr.set_item("oxb", itm.second._oxb);
+            }
+            if (itm.second._oyb)
+            {
+                spr.set_item("oyb", itm.second._oyb);
             }
         }
 
@@ -692,13 +815,6 @@ namespace box
                 return true;
             }
         }
-        return false;
-    }
-
-    bool app::set_origin(sprite* spr, ImVec2 off) const
-    {
-        spr->_oxa = int32_t(spr->_region.width * off.x);
-        spr->_oya = int32_t(spr->_region.height * off.y);
         return false;
     }
 

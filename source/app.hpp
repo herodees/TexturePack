@@ -4,6 +4,14 @@
 
 namespace box
 {
+    enum sprite_data : int32_t
+    {
+        Defualt,
+        One = Defualt,
+        Two,
+        NinePatch,
+    };
+
 	struct sprite
 	{
         Image     _img{};
@@ -13,10 +21,17 @@ namespace box
         int32_t   _oya{};
         int32_t   _oxb{};
         int32_t   _oyb{};
-        int32_t   _data{};
+        int32_t   _data{sprite_data::Defualt};
         bool      _packed{};
 	};
 
+    struct drag_data
+    {
+        sprite* _drag_origin{};
+        point2f _drag_begin{};
+        bool    _hovered_active[2]{};
+        bool    _drag_active[2]{};
+    };
 
 	class app
     {
@@ -28,16 +43,18 @@ namespace box
         void show_menu();
 
         void show_properties();
+        void show_atlas_properties();
+        void show_sprite_properties();
         void show_list();
         void show_texture();
         void show_canvas(matrix2d& transform);
+        bool show_align(int32_t& x, int32_t& y, float w, float h) const;
 
         bool open_atlas(const char* path);
         bool save_atlas(const char* path);
         bool add_file(const char* path);
         bool add_files();
         bool remove_file(sprite* spr);
-        bool set_origin(sprite* spr, ImVec2 off) const;
         bool repack();
         void reset();
 
@@ -48,9 +65,7 @@ namespace box
 
         std::map<std::string, sprite> _items;
         sprite*                       _active{};
-        sprite*                       _drag_origin{};
-        point2f                       _drag_begin;
-        bool                          _hovered_active{};
+        drag_data                     _drag{};
         std::string                   _active_name;
         std::vector<sprite*>          _sprites;
         float                         _zoom{1.0f};
