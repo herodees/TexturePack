@@ -256,7 +256,9 @@ namespace box
                 ItemLabel("Origin Y2");
                 ImGui::DragInt("##soy2", &_active->_oyb);
                 ItemLabel("Align");
+                ImGui::PushID(42);
                 show_align(_active->_oxb, _active->_oyb, _active->_region.width, _active->_region.height);
+                ImGui::PopID();
             }
             // Nine patch region
             if (_active->_data == sprite_data::NinePatch)
@@ -454,10 +456,12 @@ namespace box
                 if (_active == &spr.second)
                 {
                     _drag._hovered_active[0] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
-                                                                    spr.second._region.y + spr.second._oya}) < pow2(6);
+                                                                    spr.second._region.y + spr.second._oya}) <
+                                               pow2(8 / _zoom);
 
                     _drag._hovered_active[1] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxb,
-                                                                    spr.second._region.y + spr.second._oyb}) < pow2(6);
+                                                                    spr.second._region.y + spr.second._oyb}) <
+                                               pow2(8 / _zoom);
 
                     if (_drag._hovered_active[0] || _drag._hovered_active[1])
                     {
