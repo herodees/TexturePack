@@ -82,6 +82,7 @@ namespace box
         bool                          _embed{};
         bool                          _visible_origin{};
         bool                          _visible_region{true};
+        bool                          _visible_index{};
         bool                          _dirty{};
         std::string                   _path;
         std::string                   _str;

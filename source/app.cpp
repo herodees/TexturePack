@@ -297,6 +297,7 @@ namespace box
         {
             ImVec2 ico(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
             auto clr = ImGui::GetColorU32(ImGuiCol_Text);
+            int    index = 1;
             for (auto& spr : _items)
             {
                 ImGui::PushID(&spr.second);
@@ -315,10 +316,11 @@ namespace box
                 ImGui::Image((ImTextureID)&spr.second._txt,
                              ImVec2(scle * spr.second._txt.width, scle * spr.second._txt.height));
                 ImGui::SameLine(ico.x + 10);
-                ImGui::Text(spr.first.c_str());
+                ImGui::Text(TextFormat("%02d %s", index, spr.first.c_str()));
 
                 ImGui::PopStyleColor();
                 ImGui::PopID();
+                ++index;
             }
         }
         ImGui::EndChildFrame();
@@ -356,6 +358,8 @@ namespace box
             ImGui::Checkbox("Show origin", &_visible_origin);
             ImGui::SameLine();
             ImGui::Checkbox("Show region", &_visible_region);
+            ImGui::SameLine();
+            ImGui::Checkbox("Show index", &_visible_index);
 
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0);
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
@@ -413,8 +417,10 @@ namespace box
             dc->AddRect(origin - ImVec2(3, 3), origin + ImVec2(4, 4), clr);
             };
 
+        int index = 0;
         for (auto& spr : _items)
         {
+            ++index;
             if (!spr.second._packed)
                 continue;
             bool isactive = _active == nullptr || _active == &spr.second;
@@ -445,6 +451,12 @@ namespace box
             {
                 dc->AddRect(local.transformPoint(p1), local.transformPoint(p2), clr);
             }
+
+            if (_visible_index || _active == &spr.second)
+            {
+                dc->AddText(local.transformPoint(p1) + ImVec2{2, 1}, clr, TextFormat("%d", index));
+            }
+
             if (_visible_origin || _active == &spr.second)
             {
                 auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._oxa), float(spr.second._oya)});
