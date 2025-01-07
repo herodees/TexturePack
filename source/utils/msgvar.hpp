@@ -2,17 +2,32 @@
 
 #include "msgbuff.hpp"
 
-namespace box
+namespace box::msg
 {
-	namespace msg
-	{
 		class VarMembers;
 		class VarElements;
 
-		template <typename T> inline void MsgFree(T* p) { ::free(p); }
-		template <typename T> inline T* MsgAlloc(size_t s) { T* p = (T*)::malloc(s * sizeof(T)); return p; }
-		template <typename T> inline T* MsgCreate() { T* p = new(MsgAlloc<T>(1)) T(); return p; }
-		template <typename T> inline void MsgDelete(T* p) { if (!p) return; p->~T(); MsgFree(p); }
+		template <typename T> inline T* MsgAlloc(size_t s)
+		{ 
+			// Allocate memory for `s` objects of type `T` without initializing them
+			return static_cast<T*>(::operator new[](s * sizeof(T)));
+		}
+
+		template <typename T> inline T* MsgCreate()
+		{
+			T* p = MsgAlloc<T>(1);
+			return new (p) T();
+		}
+
+		template <typename T> inline void MsgFree(T* p) { ::operator delete[](p); }
+
+		template <typename T> inline void MsgDelete(T* p)
+		{ 
+			if (!p)
+				return;
+			p->~T();
+			MsgFree(p);
+		}
 
 		template<typename T> struct Arr
 		{
@@ -30,30 +45,72 @@ namespace box
 			void push_back(const T& x) { reserve((_size + 4) & ~3); new(&_data[_size++])T(x); }
 			void resize(uint32_t n) { reserve(n); _size = n; }
 			T& back() { return _data[_size - 1]; }
+			void erase(uint32_t n)
+			{
+				_data[n].~T();
+				::memmove(_data + n, _data + n + 1, sizeof(T) * (--_size - n));
+			}
+			void erase(uint32_t n, uint32_t c)
+			{
+				for (uint32_t i = 0; i < c; i++)
+					_data[n + i].~T();
+				::memmove(_data + n, _data + n + c, sizeof(T) * (_size - n - c));
+				_size -= c;
+			}
 		};
 
-		class Var
+        class Var;
+        struct Params;
+
+		struct VarBase
+		{
+			enum class Tag { Undefined, Null, Int32, Int64, Flt32, Flt64, Bool, Function, Id, String, Array, Object  };
+			using ArrData = Arr<Var>;
+
+			using Fnc = void(*)(Params&);
+
+			VarBase() = default;
+			explicit VarBase(VarError err) : _tag(Tag::Undefined), _u64(err) {}
+			explicit VarBase(int32_t v) : _tag(Tag::Int32), _u32(v) {}
+			explicit VarBase(int64_t v) : _tag(Tag::Int64), _u64(v) {}
+			explicit VarBase(uint32_t v) : _tag(Tag::Int32), _u32(v) {}
+			explicit VarBase(uint64_t v) : _tag(Tag::Int64), _u64(v) {}
+			explicit VarBase(nullptr_t) : _tag(Tag::Null), _u64(0) {}
+			explicit VarBase(float v) : _tag(Tag::Flt32), _flt32(v) {}
+			explicit VarBase(double v) : _tag(Tag::Flt64), _flt64(v) {}
+			explicit VarBase(bool v) : _tag(Tag::Bool), _bool(v) {}
+			explicit VarBase(Fnc v) : _tag(Tag::Function), _fnc(v){}
+
+			Tag _tag;
+			union
+			{
+				int64_t _u64;
+				int32_t _u32;
+				int16_t _u16;
+				int8_t _u8;
+				double _flt64;
+				float _flt32;
+				bool _bool;
+                Fnc _fnc;
+				ArrData* _arr;
+				char _str[sizeof(double)];
+			};
+		};
+
+		class Var : VarBase
 		{
 			struct Parser;
-			enum class Tag { Undefined, Null, Int32, Int64, Flt32, Flt64, Bool, Id, String, Array, Object };
-			using ArrData = Arr<Var>;
 		public:
 			using Member = std::pair<Var, Var>;
 
 			~Var() { clear(); }
-			Var() : _tag(Tag::Undefined), _u64(0) {}
-			Var(VarError err) : _tag(Tag::Undefined), _u64(err) {}
-			Var(Var&& v) noexcept : _tag(v._tag), _u64(v._u64) { v._tag = Tag::Undefined; v._u64 = 0; }
-			Var(const Var& v) : _tag(v._tag), _u64(v._u64) { if (_tag > Tag::Id) ++_arr->_ref; }
-			Var(int32_t v) : _tag(Tag::Int32), _u32(v) {}
-			Var(int64_t v) : _tag(Tag::Int64), _u64(v) {}
-			Var(uint32_t v) : _tag(Tag::Int32), _u32(v) {}
-			Var(uint64_t v) : _tag(Tag::Int64), _u64(v) {}
-			Var(nullptr_t) : _tag(Tag::Null), _u64(0) {}
-			Var(float v) : _tag(Tag::Flt32), _flt32(v) {}
-			Var(double v) : _tag(Tag::Flt64), _flt64(v) {}
-			Var(bool v) : _tag(Tag::Bool), _bool(v) {}
-			Var(std::string_view v) : Var() { (v.size() < sizeof(_u64)) ? setid(v) : setstr(v); }
+			Var() : VarBase{} {}
+			Var(Var&& v) : VarBase{ v } { v._u64 = 0; v._tag = Tag::Undefined; }
+			Var(const Var& v) : VarBase{ v } { if (_tag > Tag::Id) ++_arr->_ref; }
+			Var(auto v) : VarBase{ v } {}
+			Var(std::string_view v) : VarBase{} { (v.size() < sizeof(_u64)) ? setid(v) : setstr(v); }
+			Var(const std::string& v) : Var(std::string_view(v)) {}
+			Var(const char* v) : Var(std::string_view(v)) {}
 
 			bool             is_undefined() const;
 			bool             is_error() const;
@@ -66,6 +123,7 @@ namespace box
 			bool             is_double() const;
 			bool             is_string() const;
 			bool             is_bool() const;
+			bool             is_function() const;
 
 			bool             get(bool def) const;
 			int32_t          get(int32_t def) const;
@@ -78,16 +136,33 @@ namespace box
 			std::string_view get(std::string_view def) const;
 
 			std::string_view str() const;
-			const char*      c_str() const;
+			const char* c_str() const;
 
+			Var call(Var* atts, size_t attc);
+
+            template <typename... Args, typename = std::enable_if_t<(std::is_constructible_v<Var, Args> && ...)>>
+            Var call(Args&&... args)
+            {
+                Var arguments[] = {std::forward<Args>(args)...};
+                return call(arguments, sizeof...(args));
+            }
+
+#if defined(__cpp_char8_t)
+			const char8_t* ch8_str() const;
+			const char8_t* get(const char8_t* def) const;
+#endif
+		
+			void             push_back(auto v) { push_back(Var(v)); };
 			void             push_back(const Var& v);
 			void             push_back(std::string_view key, const Var& v);
-			
+
 			Var              get_item(uint32_t n);
+			void             set_item(uint32_t n, auto v) { set_item(n, Var(v)); }
 			void             set_item(uint32_t n, const Var& v);
 
 			Var              get_item(std::string_view key);
 			Var              get_key(uint32_t n);
+			void             set_item(std::string_view key, auto v) { set_item(key, Var(v)); }
 			void             set_item(std::string_view key, const Var& v);
 
 			void             make_array(uint32_t s);
@@ -98,40 +173,36 @@ namespace box
 
 			Var              operator[](uint32_t n);
 			Var              operator[](std::string_view k);
-			Var&             operator=(const Var& c);
+			Var& operator=(const Var& c);
 
 			VarMembers       members() const;
 			VarElements      elements() const;
 
 			VarError         from_string(const char* str);
-			bool             to_string(std::string& str);
+			bool             to_string(std::string& str, bool pretty = false, uint32_t indent = 0);
 
 			VarError         from_msg(const Value& in);
 			bool             to_msg(Writer& out);
 
 			VarError         error() const;
+
+			Var              clone() const;
+            void             erase();
+			void             erase(uint32_t n);
+			void             erase(std::string_view key);
+			Tag              get_tag() const;
 		private:
 			void             setstr(std::string_view v);
 			void             setid(std::string_view v);
-			void             set(const Var& v);
 			Var              from_msg_value(const Value& in);
-			
-			Tag _tag;
-			union
-			{
-				int64_t _u64;
-				int32_t _u32;
-				int16_t _u16;
-				int8_t _u8;
-				double _flt64;
-				float _flt32;
-				bool _bool;
-				ArrData* _arr;
-				char _str[sizeof(double)];
-			};
 		};
 
-
+		struct Params
+        {
+            Var*   argv;
+            size_t argc;
+            Var    retval;
+        };
 
 		class VarMembers
 		{
@@ -194,7 +265,7 @@ namespace box
 		inline Var Var::Parser::parse_number(Stream& s)
 		{
 			bool intOnly = true;
-			unsigned long long integer = 0;
+			uint64_t integer = 0;
 			double significand = 0;
 			int fraction = 0;
 			int exponent = 0;
@@ -259,8 +330,8 @@ namespace box
 			}
 
 			if (intOnly)
-				return integer;
-			return significand;
+				return Var(integer);
+			return Var(significand);
 		}
 
 		inline Var Var::Parser::parse_string(Stream& s, Arr<char>& v)
@@ -282,7 +353,7 @@ namespace box
 
 					if (ch == '"') {
 						length = uint32_t(first - (v._data + offset));
-						return std::string_view(v._data, length);
+						return Var(std::string_view(v._data, length));
 					}
 
 					if (ch == '\\') {
@@ -348,18 +419,18 @@ namespace box
 			case 'f':
 				s.getch();
 				if (s.getch() == 'a' && s.getch() == 'l' && s.getch() == 's' && s.getch() == 'e')
-					return false;
-				return VarError::invalid_literal_name;
+					return Var(false);
+				return Var(VarError::invalid_literal_name);
 			case 't':
 				s.getch();
 				if (s.getch() == 'r' && s.getch() == 'u' && s.getch() == 'e')
-					return true;
-				return VarError::invalid_literal_name;
+					return Var(true);
+				return Var(VarError::invalid_literal_name);
 			case 'n':
 				s.getch();
 				if (s.getch() == 'u' && s.getch() == 'l' && s.getch() == 'l')
-					return nullptr;
-				return VarError::invalid_literal_name;
+					return Var(nullptr);
+				return Var(VarError::invalid_literal_name);
 			case '[': {
 				s.getch();
 				uint32_t frame = _backlog._size;
@@ -367,7 +438,7 @@ namespace box
 				element:
 					_backlog.push_back(parse_value(s));
 					if (_backlog.back().is_error())
-						return _backlog.back();
+						return Var(_backlog.back());
 
 					if (s.skipws() == ',') {
 						s.getch();
@@ -376,7 +447,7 @@ namespace box
 				}
 
 				if (s.getch() != ']')
-					return VarError::missing_comma_or_bracket;
+					return Var(VarError::missing_comma_or_bracket);
 
 				uint32_t size = uint32_t(_backlog._size - frame);
 				if (!size)
@@ -392,14 +463,14 @@ namespace box
 				if (s.skipws() != '}') {
 				member:
 					if (s.peek() != '"')
-						return VarError::expecting_string;
+						return Var(VarError::expecting_string);
 					s.getch();
 					_backlog.push_back(parse_string(s, _string));
 					if (_backlog.back().is_error())
 						return _backlog.back();
 
 					if (s.skipws() != ':')
-						return VarError::missing_colon;
+						return Var(VarError::missing_colon);
 					s.getch();
 					_backlog.push_back(parse_value(s));
 					if (_backlog.back().is_error())
@@ -413,7 +484,7 @@ namespace box
 				}
 
 				if (s.getch() != '}')
-					return VarError::missing_comma_or_bracket;
+					return Var(VarError::missing_comma_or_bracket);
 
 				uint32_t size = _backlog._size - frame;
 				if (!size) return make(false, nullptr, 0);
@@ -429,9 +500,9 @@ namespace box
 				{
 					Var n = parse_number(s);
 					if (n.is_double())
-						return -n.get(0.0);
+						return Var(-n.get(0.0));
 					if (n.is_int64())
-						return -n.get(0ll);
+						return Var(-n.get(0ll));
 					return n;
 				}
 				break;
@@ -447,8 +518,8 @@ namespace box
 		{
 			Stream s(str);
 			Var v = parse_value(s);
-			if (v.is_error() && s.skipws())
-				v = VarError::unexpected_character;
+			if (v.is_error() || s.skipws())
+				v = Var(VarError::unexpected_character);
 			for (uint32_t n = 0; n < _backlog._size; ++n)
 				_backlog._data[n].clear();
 			return v;
@@ -510,7 +581,22 @@ namespace box
 			if (_tag == Tag::Id)
 				return _str;
 			return "";
+        }
+
+        inline Var Var::call(Var* atts, size_t attc)
+        {
+            if (!is_function())
+				return Var();
+            Params p{atts, attc};
+			_fnc(p);
+            return p.retval;
+        }
+
+#if defined(__cpp_char8_t)
+		inline const char8_t* Var::ch8_str() const {
+			return (const char8_t*)c_str();
 		}
+#endif
 
 		inline void Var::setstr(std::string_view v)
 		{
@@ -640,7 +726,7 @@ namespace box
 			if (_arr->_size <= n) {
 				auto s = (n + 4) & ~3;
 				_arr->reserve(s);
-				_arr->_size = n+1;
+				_arr->_size = n + 1;
 			}
 			else
 				_arr->_data[n].clear();
@@ -653,7 +739,7 @@ namespace box
 			if (_tag == Tag::Array)
 				return _arr->_data[n];
 			if (_tag == Tag::Object)
-				return _arr->_data[n*2+1];
+				return _arr->_data[n * 2 + 1];
 			return Var();
 		}
 
@@ -689,11 +775,18 @@ namespace box
 			return error();
 		}
 
-		inline bool Var::to_string(std::string& s)
+		inline bool Var::to_string(std::string& s, bool pretty, uint32_t indent)
 		{
 			bool ret = true;
 			char buf[32];
 			std::to_chars_result res;
+
+			auto pushPretty = [](std::string& s, uint32_t indent) {
+				s.push_back('\n');
+				for (uint32_t i = 0; i < indent; i++) {
+					s.push_back('\t');
+				}
+			};
 
 			switch (_tag)
 			{
@@ -710,12 +803,26 @@ namespace box
 				s.append(buf, res.ptr - buf);
 				break;
 			case Tag::Flt32:
-				res = std::to_chars(buf, buf + std::size(buf), _flt32);
-				s.append(buf, res.ptr - buf);
+				// nan, inf, -inf is not supported by JSON format
+				if (std::isnormal(_flt32) || _flt32 == 0.0f)
+				{
+					res = std::to_chars(buf, buf + std::size(buf), _flt32);
+					s.append(buf, res.ptr - buf);
+				}
+				else {
+					s.append("null", 4);
+				}
 				break;
 			case Tag::Flt64:
-				res = std::to_chars(buf, buf + std::size(buf), _flt64);
-				s.append(buf, res.ptr - buf);
+				// nan, inf, -inf is not supported by JSON format
+				if (std::isnormal(_flt64) || _flt64 == 0.0)
+				{
+					res = std::to_chars(buf, buf + std::size(buf), _flt64);
+					s.append(buf, res.ptr - buf);
+				}
+				else {
+					s.append("null", 4);
+				}
 				break;
 			case Tag::Bool:
 				_bool ? s.append("true", 4) : s.append("false", 5);
@@ -725,19 +832,29 @@ namespace box
 			{
 				s.push_back('\"');
 				std::string_view val(str());
-				const char* e = val.data() + val.size();
-				for (const char* p = val.data(); p < e;)
+				const char* end = val.data() + val.size();
+				for (const char* p = val.data(); p < end; ++p)
 				{
-					char c = *p++;
+					char c = *p;
 					switch (c) {
-					case '\b': s.append("\\b", 2); break;
-					case '\f': s.append("\\f", 2); break;
-					case '\n': s.append("\\n", 2); break;
-					case '\r': s.append("\\r", 2); break;
-					case '\t': s.append("\\t", 2); break;
-					case '\\': s.append("\\\\", 2); break;
-					case '"':  s.append("\\\"", 2); break;
-					default:   s.push_back(c);
+					case '\b': s.append(R"(\b)", 2); break;    // Escape backspace
+					case '\f': s.append(R"(\f)", 2); break;    // Escape form feed
+					case '\n': s.append(R"(\n)", 2); break;    // Escape newline
+					case '\r': s.append(R"(\r)", 2); break;    // Escape carriage return
+					case '\t': s.append(R"(\t)", 2); break;    // Escape tab
+					case '\\': s.append(R"(\\)", 2); break;   // Escape backslash
+					case '\"': s.append(R"(\")", 2); break;   // Escape double quote
+					default:
+						if (static_cast<unsigned char>(c) < 0x20) {
+							// Escape control characters below ASCII 0x20 as \u00XX
+							s.append(R"(\u00)");
+							s.push_back("0123456789ABCDEF"[std::to_integer<int>((std::byte(c) >> 4) & std::byte(0xF))]);
+							s.push_back("0123456789ABCDEF"[std::to_integer<int>(std::byte(c) & std::byte(0xF))]);
+						}
+						else {
+							s.push_back(c); // Add regular character as-is
+						}
+						break;
 					}
 				}
 				s.push_back('\"');
@@ -748,17 +865,24 @@ namespace box
 			{
 				if (_arr->_size)
 				{
+					indent++;
 					char comma = '[';
 					for (auto& it : elements())
 					{
 						s.push_back(comma);
-						ret &= it.to_string(s);
+						if (pretty)
+							pushPretty(s, indent);
+						ret &= it.to_string(s, pretty, indent);
 						comma = ',';
 					}
+					indent--;
+					if (pretty)
+						pushPretty(s, indent);
 					s.push_back(']');
 				}
-				else
+				else {
 					s.append("[]", 2);
+				}
 			}
 			break;
 
@@ -766,19 +890,26 @@ namespace box
 			{
 				if (_arr->_size)
 				{
+					indent++;
 					char comma = '{';
 					for (auto& it : members())
 					{
 						s.push_back(comma);
-						ret &= it.first.to_string(s);
+						if (pretty)
+							pushPretty(s, indent);
+						ret &= it.first.to_string(s, pretty, indent);
 						s.push_back(':');
-						ret &= it.second.to_string(s);
+						ret &= it.second.to_string(s, pretty, indent);
 						comma = ',';
 					}
+					indent--;
+					if (pretty)
+						pushPretty(s, indent);
 					s.push_back('}');
 				}
-				else
+				else {
 					s.append("{}", 2);
+				}
 			}
 			break;
 
@@ -938,7 +1069,12 @@ namespace box
 		inline bool Var::is_bool() const
 		{
 			return _tag == Tag::Bool;
-		}
+        }
+
+        inline bool Var::is_function() const
+        {
+            return _tag == Tag::Function;
+        }
 
 		inline bool Var::get(bool def) const
 		{
@@ -1010,6 +1146,13 @@ namespace box
 			return def;
 		}
 
+#if defined(__cpp_char8_t)
+		inline const char8_t* Var::get(const char8_t* def) const
+		{
+			return (const char8_t*)get((const char*)def);
+		}
+#endif
+
 		inline std::string_view Var::get(std::string_view def) const
 		{
 			if (_tag == Tag::String)
@@ -1018,5 +1161,66 @@ namespace box
 				return _str;
 			return def;
 		}
-	}
+
+		inline Var::Tag Var::get_tag() const
+		{
+			return _tag;
+		}
+
+		inline Var Var::clone() const
+		{
+			if (this->is_array())
+			{
+				Var new_arr;
+				new_arr.make_array(this->size());
+				for (auto& k : this->elements())
+					new_arr.push_back(k.clone());
+				return new_arr;
+			}
+			else if (this->is_object())
+			{
+				Var new_obj;
+				new_obj.make_object(this->size());
+				for (auto& k : this->members())
+					new_obj.set_item(k.first.c_str(), k.second.clone());
+				return new_obj;
+			}
+			else if (this->is_string())
+			{
+				return Var(this->str());
+			}
+			return *this;
+		}
+
+        inline void Var::erase()
+        {
+            if (_tag == Tag::Array)
+                this->_arr->resize(0);
+            else if (_tag == Tag::Object)
+                this->_arr->resize(0);
+        }
+
+		inline void Var::erase(uint32_t n)
+		{
+			if (_tag == Tag::Array)
+				this->_arr->erase(n);
+			else if (_tag == Tag::Object)
+				this->_arr->erase(n, 2);
+		}
+
+		inline void Var::erase(std::string_view key)
+		{
+			if (_tag != Tag::Object)
+				return;
+			uint32_t n = 0;
+			for (auto& k : this->members())
+			{
+				if (k.first.str() == key)
+				{
+					this->_arr->erase(n, 2);
+					break;
+				}
+				n += 2;
+			}
+		}
 }

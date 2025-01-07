@@ -2,8 +2,10 @@
 
 #include <vector>
 #include <string_view>
+#include <string>
 #include <charconv>
 #include <cassert>
+#include <cmath>
 
 #define EMSG_BUFFER std::vector<char>
 #define EMSG_MAX_STACK_SIZE 128
@@ -472,12 +474,12 @@ namespace box
                 s.getch();
                 _out.begin_array();
                 if (s.skipws() != ']') {
-                element:
+                div:
                     VarError r = parse_value(s);
                     if (r) return r;
                     if (s.skipws() == ',') {
                         s.getch();
-                        goto element;
+                        goto div;
                     }
                 }
 
