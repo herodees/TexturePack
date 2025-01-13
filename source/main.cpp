@@ -88,13 +88,15 @@ void ShowDock(box::app& application)
         ImGui::DockBuilderAddNode(dockspace_id); // Add empty node
 
         ImGuiID dock_main_id = dockspace_id; // This variable will track the document node, however we are not using it here as we aren't docking anything into it.
-        ImGuiID dock_id_list = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.20f, NULL, &dock_main_id);
+        ImGuiID dock_id_list   = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.20f, NULL, &dock_main_id);
+        ImGuiID dock_id_comp   = ImGui::DockBuilderSplitNode(dock_id_list, ImGuiDir_Down, 0.30f, NULL, &dock_id_list);
         ImGuiID dock_id_prop   = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.25f, NULL, &dock_main_id);
         ImGuiID dock_id_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.20f, NULL, &dock_main_id);
 
         ImGui::DockBuilderDockWindow("Texture", dock_id_bottom);
         ImGui::DockBuilderDockWindow("Properties", dock_id_prop);
         ImGui::DockBuilderDockWindow("Sprites", dock_id_list);
+        ImGui::DockBuilderDockWindow("Compositions", dock_id_comp);
         ImGui::DockBuilderFinish(dockspace_id);
     }
 

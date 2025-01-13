@@ -23,7 +23,19 @@ namespace box
         int32_t   _oyb{};
         int32_t   _data{sprite_data::Defualt};
         bool      _packed{};
-	};
+    };
+
+    struct composition
+    {
+        struct node
+        {
+            float   _rotation{};
+            point2f _scale;
+            point2f _position;
+            sprite* _sprite;
+        };
+        std::vector<node> _nodes;
+    };
 
     struct drag_data
     {
@@ -31,6 +43,14 @@ namespace box
         point2f _drag_begin{};
         bool    _hovered_active[2]{};
         bool    _drag_active[2]{};
+    };
+
+    struct canvas_data
+    {
+        float    _zoom{1.0f};
+        float    _ideal_zoom{1.0f};
+        point2f  _ideal_offset;
+        matrix2d _transform;
     };
 
 	class app
@@ -44,16 +64,20 @@ namespace box
 
         void show_properties();
         void show_atlas_properties();
+        void show_composite_properties();
         void show_sprite_properties();
         void show_list();
+        void show_composition();
         void show_texture();
-        void show_canvas(matrix2d& transform);
+        void show_canvas(canvas_data& canvas);
         bool show_align(int32_t& x, int32_t& y, float w, float h) const;
 
         bool open_atlas(const char* path);
         bool save_atlas(const char* path);
         bool add_file(const char* path);
         bool add_files();
+        bool add_composition(const char* path);
+        bool remove_composition(composition* spr);
         bool remove_file(sprite* spr);
         bool repack();
         void reset();
@@ -64,13 +88,13 @@ namespace box
         msg::Var save_cb64(Image img) const;
 
         std::map<std::string, sprite> _items;
+        std::map<std::string, composition> _compositions;
         sprite*                       _active{};
+        composition*                  _active_comp{};
         drag_data                     _drag{};
         std::string                   _active_name;
+        std::string                   _active_comp_name;
         std::vector<sprite*>          _sprites;
-        float                         _zoom{1.0f};
-        float                         _ideal_zoom{1.0f};
-        point2f                       _ideal_offset;
         int32_t                       _heuristic{};
         int32_t                       _padding{};
         int32_t                       _spacing{};
@@ -83,12 +107,14 @@ namespace box
         bool                          _visible_origin{};
         bool                          _visible_region{true};
         bool                          _visible_index{};
+        bool                          _composite_mode{};
         bool                          _dirty{};
         std::string                   _path;
         std::string                   _str;
         std::vector<maxRectsSize>     _item_rect;
         std::vector<maxRectsPosition> _item_pos;
-        matrix2d                      _transform;
+        canvas_data                   _atlas_canvas{};
+        canvas_data                   _comp_canvas{};
         point2f                       _mouse{NAN, NAN};
         Texture                       _alpha_txt{};
     };

@@ -21,6 +21,7 @@ namespace box
         show_properties();
         show_texture();
         show_list();
+        show_composition();
 
         if (IsFileDropped())
         {
@@ -104,6 +105,11 @@ namespace box
             {
                 show_sprite_properties();
             }
+
+            if (_active_comp && ImGui::CollapsingHeader("Composite", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                show_composite_properties();
+            }
         }
         ImGui::EndChildFrame();
 
@@ -184,18 +190,51 @@ namespace box
         }
     }
 
+    static void ItemLabel(const char* label)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text(label);
+        ImGui::TableSetColumnIndex(1);
+        ImGui::SetNextItemWidth(-FLT_MIN);
+    }
+
+    void app::show_composite_properties()
+    {
+        if (ImGui::BeginTable("##cmpprop",
+                              2,
+                              ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY))
+        {
+            ItemLabel("Name");
+            ImGui::InputText("##sn", &_active_comp_name);
+            if (ImGui::IsItemDeactivatedAfterEdit())
+            {
+                for (auto& el : _compositions)
+                {
+                    if (&el.second == _active_comp)
+                    {
+                        if (_compositions.end() == _compositions.find(_active_comp_name))
+                        {
+                            auto nodeHandler  = _compositions.extract(el.first);
+                            nodeHandler.key() = _active_comp_name;
+                            _compositions.insert(std::move(nodeHandler));
+                        }
+                        else
+                        {
+                            _active_comp_name = el.first;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            ImGui::EndTable();
+        }
+    }
+
     void app::show_sprite_properties()
     {
-        auto ItemLabel = [](const char* label)
-        {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text(label);
-            ImGui::TableSetColumnIndex(1);
-            ImGui::SetNextItemWidth(-FLT_MIN);
-        };
-
         if (ImGui::BeginTable("##sprprop",
                               2,
                               ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY))
@@ -329,29 +368,93 @@ namespace box
         ImGui::End();
     }
 
+    void app::show_composition()
+    {
+        ImGui::Begin("Compositions");
+
+        if (ImGui::Button(ICON_FA_FOLDER_PLUS))
+        {
+            std::string name("comp_");
+            name += std::to_string(rand());
+            add_composition(name.c_str());
+            _dirty = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_FOLDER_MINUS))
+        {
+            remove_composition(_active_comp);
+            _dirty = true;
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 15});
+        if (ImGui::BeginChildFrame(1, {-1, -1}))
+        {
+            ImVec2 ico(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
+            auto   clr   = ImGui::GetColorU32(ImGuiCol_Text);
+
+            for (auto& spr : _compositions)
+            {
+                ImGui::PushID(&spr.second);
+
+
+                if (ImGui::Selectable("##_", _active_comp == &spr.second))
+                {
+                    _composite_mode   = true;
+                    _active_comp = &spr.second;
+                    _active      = nullptr;
+                    _active_comp_name = spr.first;
+                }
+                ImGui::SameLine();
+
+                ImGui::Text(TextFormat(" %s [%d]", spr.first.c_str(), spr.second._nodes.size() ));
+
+                ImGui::PopID();
+            }
+        }
+        ImGui::EndChildFrame();
+        ImGui::PopStyleVar();
+
+        ImGui::End();
+    }
+
     void app::show_texture()
     {
         if (ImGui::Begin("Texture", 0, ImGuiWindowFlags_NoScrollWithMouse))
         {
+            auto old_c = ImGui::GetStyle().Colors[ImGuiCol_Button];
+            auto new_c = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
+
+            ImGui::GetStyle().Colors[ImGuiCol_Button] = _composite_mode ? old_c : new_c;
+            if (ImGui::Button(" Atlas ", {90,0}))
+                _composite_mode = false;
+            ImGui::SameLine();
+            ImGui::GetStyle().Colors[ImGuiCol_Button] = !_composite_mode ? old_c : new_c;
+            if (ImGui::Button(" Composite ", {90, 0}))
+                _composite_mode = true;
+            ImGui::SameLine();
+            ImGui::GetStyle().Colors[ImGuiCol_Button] = old_c;
+
+            auto& canvas = _composite_mode ? _comp_canvas : _atlas_canvas;
+
             ImGui::SetNextItemWidth(200);
-            if (ImGui::SliderFloat("##zm", &_zoom, 0.1f, 5.f))
+            if (ImGui::SliderFloat("##zm", &canvas._zoom, 0.1f, 5.f))
             {
-                set_atlas_scale({_zoom, _zoom}, {0,0});
+                set_atlas_scale({canvas._zoom, canvas._zoom}, {0, 0});
             }
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_EXPAND))
             {
-                _zoom = 1.f;
-                _transform.reset();
+                canvas._zoom = 1.f;
+                canvas._transform.reset();
             }
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_COMPRESS))
             {
-                _zoom = _ideal_zoom;
-                _transform.reset();
-                _transform.scale(_zoom, _zoom);
-                _transform.tx = _ideal_offset.x;
-                _transform.ty = _ideal_offset.y;
+                canvas._zoom = canvas._ideal_zoom;
+                canvas._transform.reset();
+                canvas._transform.scale(canvas._zoom, canvas._zoom);
+                canvas._transform.tx = canvas._ideal_offset.x;
+                canvas._transform.ty = canvas._ideal_offset.y;
             }
 
             ImGui::SameLine();
@@ -366,7 +469,7 @@ namespace box
 
             if (ImGui::BeginChild(10, {-1, -1}, 0, ImGuiWindowFlags_NoScrollWithMouse))
             {
-                show_canvas(_transform);
+                show_canvas(canvas);
             }
             ImGui::EndChild();
 
@@ -376,7 +479,7 @@ namespace box
         ImGui::End();
     }
 
-    void app::show_canvas(matrix2d& transform)
+    void app::show_canvas(canvas_data& canvas)
     {
         ImVec2 txtsize(!_trim ? (float)_width : (float)_trimed_width, !_trim ? (float)_height : (float)_trimed_height);
         ImVec2 from = ImGui::GetWindowPos();
@@ -385,11 +488,11 @@ namespace box
         matrix2d local({from.x, from.y}, {1.f, 1.f}, {(size.x - txtsize.x) / -2, (size.y - txtsize.y) / -2}, 0);
 
         auto iz         = size / txtsize;
-        _ideal_zoom     = iz.x < iz.y ? iz.x : iz.y;
-        _ideal_offset.x = (size.x - txtsize.x) / -2;
-        _ideal_offset.y = (size.y - txtsize.y) / -2;
+        canvas._ideal_zoom = iz.x < iz.y ? iz.x : iz.y;
+        canvas._ideal_offset.x = (size.x - txtsize.x) / -2;
+        canvas._ideal_offset.y = (size.y - txtsize.y) / -2;
 
-        local = local * transform;
+        local = local * canvas._transform;
         if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows))
             _mouse = {NAN, NAN};
         else
@@ -401,7 +504,7 @@ namespace box
         bool hover = false;
         dc->Flags  = ImDrawListFlags_None;
 
-        //dc->AddRectFilled(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x1fffffff);
+       //dc->AddRectFilled(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x1fffffff);
         dc->AddImage((ImTextureID)&_alpha_txt,
                      local.transformPoint(ImVec2()),
                      local.transformPoint(txtsize),
@@ -469,11 +572,11 @@ namespace box
                 {
                     _drag._hovered_active[0] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
                                                                     spr.second._region.y + spr.second._oya}) <
-                                               pow2(8 / _zoom);
+                                               pow2(8 / canvas._zoom);
 
                     _drag._hovered_active[1] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxb,
                                                                     spr.second._region.y + spr.second._oyb}) <
-                                               pow2(8 / _zoom);
+                                               pow2(8 / canvas._zoom);
 
                     if (_drag._hovered_active[0] || _drag._hovered_active[1])
                     {
@@ -521,10 +624,10 @@ namespace box
 
         if (!isnan(_mouse.x) && !isnan(_mouse.y) && ImGui::GetIO().MouseWheel)
         {
-            _zoom += ImGui::GetIO().MouseWheel * 0.1f;
-            if (_zoom < 0.1f)
-                _zoom = 0.1f;
-            set_atlas_scale({_zoom, _zoom}, {_mouse.x, _mouse.y});
+            canvas._zoom += ImGui::GetIO().MouseWheel * 0.1f;
+            if (canvas._zoom < 0.1f)
+                canvas._zoom = 0.1f;
+            set_atlas_scale({canvas._zoom, canvas._zoom}, {_mouse.x, _mouse.y});
         }
         else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0) && !_drag._drag_origin)
         {
@@ -537,14 +640,14 @@ namespace box
             ImGui::BeginTooltip();
             if (_drag._drag_active[0])
             {
-                _drag._drag_origin->_oxa = int32_t(_drag._drag_begin.x + off.x / _zoom);
-                _drag._drag_origin->_oya = int32_t(_drag._drag_begin.y + off.y / _zoom);
+                _drag._drag_origin->_oxa = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
+                _drag._drag_origin->_oya = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
                 ImGui::Text("%d x %d", _drag._drag_origin->_oxa, _drag._drag_origin->_oya);
             }
             if (_drag._drag_active[1])
             {
-                _drag._drag_origin->_oxb = int32_t(_drag._drag_begin.x + off.x / _zoom);
-                _drag._drag_origin->_oyb = int32_t(_drag._drag_begin.y + off.y / _zoom);
+                _drag._drag_origin->_oxb = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
+                _drag._drag_origin->_oyb = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
                 ImGui::Text("%d x %d", _drag._drag_origin->_oxb, _drag._drag_origin->_oyb);
             }
             ImGui::EndTooltip();
@@ -816,6 +919,30 @@ namespace box
         return false;
     }
 
+    bool app::add_composition(const char* path)
+    {
+        auto& comp = _compositions[path];
+        return true;
+    }
+
+    bool app::remove_composition(composition* spr)
+    {
+        if (!spr)
+            return false;
+
+        for (auto& el : _compositions)
+        {
+            if (&el.second == spr)
+            {
+                if (spr == _active_comp)
+                    _active_comp = nullptr;
+                _compositions.erase(el.first);
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool app::remove_file(sprite* spr)
     {
         if (!spr)
@@ -902,9 +1029,11 @@ namespace box
             UnloadTexture(el.second._txt);
         }
         _items.clear();
+        _compositions.clear();
         _path.clear();
         _active    = nullptr;
-        _zoom      = {1.0f};
+        _atlas_canvas._zoom = {1.f};
+        _comp_canvas._zoom  = {1.f};
         _heuristic = {};
         _padding   = {};
         _width     = {512};
@@ -916,11 +1045,11 @@ namespace box
     void app::set_atlas_scale(const ImVec2& scale, const ImVec2& world_point)
     {
         matrix2d new_transform({0, 0}, {scale.x, scale.y}, {0, 0}, 0);
-        auto s = _transform.transformPoint(world_point);
+        auto     s       = _atlas_canvas._transform.transformPoint(world_point);
         auto c = s - new_transform.transformPoint(world_point);
         new_transform.tx = c.x;
         new_transform.ty = c.y;
-        _transform = new_transform;
+        _atlas_canvas._transform = new_transform;
     }
 
     Image app::load_cb64(msg::Var ar) const
