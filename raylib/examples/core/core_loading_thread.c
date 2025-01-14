@@ -9,12 +9,13 @@
 *
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *
-*   Copyright (c) 2014-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2014-2024 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
 #include "raylib.h"
 
+// WARNING: This example does not build on Windows with MSVC compiler
 #include "pthread.h"                        // POSIX style threads management
 
 #include <stdatomic.h>                      // C11 atomic data types
@@ -40,7 +41,7 @@ int main(void)
 
     InitWindow(screenWidth, screenHeight, "raylib [core] example - loading thread");
 
-    pthread_t threadId;             // Loading data thread id
+    pthread_t threadId = { 0 };     // Loading data thread id
 
     enum { STATE_WAITING, STATE_LOADING, STATE_FINISHED } state = STATE_WAITING;
     int framesCounter = 0;

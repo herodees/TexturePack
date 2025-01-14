@@ -9,7 +9,7 @@
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *   BSD-like license that allows static linking with closed source software
 *
-*   Copyright (c) 2022-2023 Jeffery Myers (@JeffM2501)
+*   Copyright (c) 2022-2024 Jeffery Myers (@JeffM2501)
 *
 ********************************************************************************************/
 
@@ -335,6 +335,7 @@ int main(void)
             DrawFPS(screenWidth - 80, 10);
             DrawText("Drag to move light #1", 10, 10, 10, DARKGREEN);
             DrawText("Right click to add new light", 10, 30, 10, DARKGREEN);
+
         EndDrawing();
         //----------------------------------------------------------------------------------
     }

@@ -18,12 +18,6 @@ uniform vec4 colDiffuse;
 #define     LIGHT_DIRECTIONAL       0
 #define     LIGHT_POINT             1
 
-struct MaterialProperty {
-    vec3 color;
-    int useSampler;
-    sampler2D sampler;
-};
-
 struct Light {
     int enabled;
     int type;
@@ -45,6 +39,8 @@ void main()
     vec3 normal = normalize(fragNormal);
     vec3 viewD = normalize(viewPos - fragPosition);
     vec3 specular = vec3(0.0);
+
+    vec4 tint = colDiffuse * fragColor;
 
     // NOTE: Implement here your fragment shader code
 
@@ -73,7 +69,7 @@ void main()
         }
     }
 
-    vec4 finalColor = (texelColor*((colDiffuse + vec4(specular, 1.0))*vec4(lightDot, 1.0)));
+    vec4 finalColor = (texelColor*((tint + vec4(specular, 1.0))*vec4(lightDot, 1.0)));
     finalColor += texelColor*(ambient/10.0);
 
     // Gamma correction

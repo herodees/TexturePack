@@ -16,7 +16,7 @@
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *   BSD-like license that allows static linking with closed source software
 *
-*   Copyright (c) 2016-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2016-2024 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -46,6 +46,8 @@ int main(void)
     // TTF font : Font data and atlas are generated directly from TTF
     // NOTE: We define a font base size of 32 pixels tall and up-to 250 characters
     Font fontTtf = LoadFontEx("resources/pixantiqua.ttf", 32, 0, 250);
+
+    SetTextLineSpacing(16);         // Set line spacing for multiline text (when line breaks are included '\n')
 
     bool useTtf = false;
 

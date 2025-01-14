@@ -11,7 +11,7 @@
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *   BSD-like license that allows static linking with closed source software
 *
-*   Copyright (c) 2019-2023 Michał Ciesielski and Ramon Santamaria (@raysan5)
+*   Copyright (c) 2019-2024 Michał Ciesielski and Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -19,7 +19,7 @@
 
 #if defined(PLATFORM_DESKTOP)
     #define GLSL_VERSION            330
-#else   // PLATFORM_RPI, PLATFORM_ANDROID, PLATFORM_WEB
+#else   // PLATFORM_ANDROID, PLATFORM_WEB
     #define GLSL_VERSION            100
 #endif
 
@@ -77,6 +77,7 @@ int main(void)
     // De-Initialization
     //--------------------------------------------------------------------------------------
     UnloadShader(shader);
+    UnloadTexture(texture);
 
     CloseWindow();        // Close window and OpenGL context
     //--------------------------------------------------------------------------------------

@@ -3,37 +3,36 @@
 *   rtextures - Basic functions to load and draw textures
 *
 *   CONFIGURATION:
+*       #define SUPPORT_MODULE_RTEXTURES
+*           rtextures module is included in the build
 *
-*   #define SUPPORT_MODULE_RTEXTURES
-*       rtextures module is included in the build
+*       #define SUPPORT_FILEFORMAT_BMP
+*       #define SUPPORT_FILEFORMAT_PNG
+*       #define SUPPORT_FILEFORMAT_TGA
+*       #define SUPPORT_FILEFORMAT_JPG
+*       #define SUPPORT_FILEFORMAT_GIF
+*       #define SUPPORT_FILEFORMAT_QOI
+*       #define SUPPORT_FILEFORMAT_PSD
+*       #define SUPPORT_FILEFORMAT_HDR
+*       #define SUPPORT_FILEFORMAT_PIC
+*       #define SUPPORT_FILEFORMAT_PNM
+*       #define SUPPORT_FILEFORMAT_DDS
+*       #define SUPPORT_FILEFORMAT_PKM
+*       #define SUPPORT_FILEFORMAT_KTX
+*       #define SUPPORT_FILEFORMAT_PVR
+*       #define SUPPORT_FILEFORMAT_ASTC
+*           Select desired fileformats to be supported for image data loading. Some of those formats are
+*           supported by default, to remove support, just comment unrequired #define in this module
 *
-*   #define SUPPORT_FILEFORMAT_BMP
-*   #define SUPPORT_FILEFORMAT_PNG
-*   #define SUPPORT_FILEFORMAT_TGA
-*   #define SUPPORT_FILEFORMAT_JPG
-*   #define SUPPORT_FILEFORMAT_GIF
-*   #define SUPPORT_FILEFORMAT_QOI
-*   #define SUPPORT_FILEFORMAT_PSD
-*   #define SUPPORT_FILEFORMAT_HDR
-*   #define SUPPORT_FILEFORMAT_PIC
-*   #define SUPPORT_FILEFORMAT_PNM
-*   #define SUPPORT_FILEFORMAT_DDS
-*   #define SUPPORT_FILEFORMAT_PKM
-*   #define SUPPORT_FILEFORMAT_KTX
-*   #define SUPPORT_FILEFORMAT_PVR
-*   #define SUPPORT_FILEFORMAT_ASTC
-*       Select desired fileformats to be supported for image data loading. Some of those formats are
-*       supported by default, to remove support, just comment unrequired #define in this module
+*       #define SUPPORT_IMAGE_EXPORT
+*           Support image export in multiple file formats
 *
-*   #define SUPPORT_IMAGE_EXPORT
-*       Support image export in multiple file formats
+*       #define SUPPORT_IMAGE_MANIPULATION
+*           Support multiple image editing functions to scale, adjust colors, flip, draw on images, crop...
+*           If not defined only some image editing functions supported: ImageFormat(), ImageAlphaMask(), ImageResize*()
 *
-*   #define SUPPORT_IMAGE_MANIPULATION
-*       Support multiple image editing functions to scale, adjust colors, flip, draw on images, crop...
-*       If not defined only some image editing functions supported: ImageFormat(), ImageAlphaMask(), ImageResize*()
-*
-*   #define SUPPORT_IMAGE_GENERATION
-*       Support procedural image generation functionality (gradient, spot, perlin-noise, cellular)
+*       #define SUPPORT_IMAGE_GENERATION
+*           Support procedural image generation functionality (gradient, spot, perlin-noise, cellular)
 *
 *   DEPENDENCIES:
 *       stb_image        - Multiple image formats loading (JPEG, PNG, BMP, TGA, PSD, GIF, PIC)
@@ -43,7 +42,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2013-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2013-2024 Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -72,10 +71,10 @@
 #if defined(SUPPORT_MODULE_RTEXTURES)
 
 #include "utils.h"              // Required for: TRACELOG()
-#include "rlgl.h"               // OpenGL abstraction layer to OpenGL 1.1, 3.3 or ES2
+#include "rlgl.h"               // OpenGL abstraction layer to multiple versions
 
-#include <stdlib.h>             // Required for: malloc(), free()
-#include <string.h>             // Required for: strlen() [Used in ImageTextEx()], strcmp() [Used in LoadImageFromMemory()]
+#include <stdlib.h>             // Required for: malloc(), calloc(), free()
+#include <string.h>             // Required for: strlen() [Used in ImageTextEx()], strcmp() [Used in LoadImageFromMemory()/LoadImageAnimFromMemory()/ExportImageToMemory()]
 #include <math.h>               // Required for: fabsf() [Used in DrawTextureRec()]
 #include <stdio.h>              // Required for: sprintf() [Used in ExportImageAsCode()]
 
@@ -139,13 +138,24 @@
      defined(SUPPORT_FILEFORMAT_PIC) || \
      defined(SUPPORT_FILEFORMAT_PNM))
 
+    #if defined(__GNUC__) // GCC and Clang
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wunused-function"
+    #endif
+
     #define STBI_MALLOC RL_MALLOC
     #define STBI_FREE RL_FREE
     #define STBI_REALLOC RL_REALLOC
 
+    #define STBI_NO_THREAD_LOCALS
+
     #define STB_IMAGE_IMPLEMENTATION
     #include "external/stb_image.h"         // Required for: stbi_load_from_file()
                                             // NOTE: Used to read image data (multiple formats support)
+
+    #if defined(__GNUC__) // GCC and Clang
+        #pragma GCC diagnostic pop
+    #endif
 #endif
 
 #if (defined(SUPPORT_FILEFORMAT_DDS) || \
@@ -154,25 +164,35 @@
      defined(SUPPORT_FILEFORMAT_PVR) || \
      defined(SUPPORT_FILEFORMAT_ASTC))
 
+    #if defined(__GNUC__) // GCC and Clang
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wunused-function"
+    #endif
+
     #define RL_GPUTEX_IMPLEMENTATION
     #include "external/rl_gputex.h"         // Required for: rl_load_xxx_from_memory()
                                             // NOTE: Used to read compressed textures data (multiple formats support)
+
+    #if defined(__GNUC__) // GCC and Clang
+        #pragma GCC diagnostic pop
+    #endif
 #endif
 
 #if defined(SUPPORT_FILEFORMAT_QOI)
     #define QOI_MALLOC RL_MALLOC
     #define QOI_FREE RL_FREE
 
-#if defined(_MSC_VER ) // qoi has warnings on windows, so disable them just for this file
-#pragma warning( push )
-#pragma warning( disable : 4267)
-#endif
+    #if defined(_MSC_VER)               // Disable some MSVC warning
+        #pragma warning(push)
+        #pragma warning(disable : 4267)
+    #endif
+
     #define QOI_IMPLEMENTATION
     #include "external/qoi.h"
 
-#if defined(_MSC_VER )
-#pragma warning( pop )
-#endif
+    #if defined(_MSC_VER)
+        #pragma warning(pop)            // Disable MSVC warning suppression
+    #endif
 
 #endif
 
@@ -192,8 +212,18 @@
 
 #define STBIR_MALLOC(size,c) ((void)(c), RL_MALLOC(size))
 #define STBIR_FREE(ptr,c) ((void)(c), RL_FREE(ptr))
+
+#if defined(__GNUC__) // GCC and Clang
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "external/stb_image_resize.h"  // Required for: stbir_resize_uint8() [ImageResize()]
+#include "external/stb_image_resize2.h"     // Required for: stbir_resize_uint8_linear() [ImageResize()]
+
+#if defined(__GNUC__) // GCC and Clang
+    #pragma GCC diagnostic pop
+#endif
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -219,11 +249,13 @@
 //----------------------------------------------------------------------------------
 // Other Modules Functions Declaration (required by text)
 //----------------------------------------------------------------------------------
-// ...
+extern void LoadFontDefault(void);          // [Module: text] Loads default font, required by ImageDrawText()
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
 //----------------------------------------------------------------------------------
+static float HalfToFloat(unsigned short x);
+static unsigned short FloatToHalf(float x);
 static Vector4 *LoadImageDataNormalized(Image image);       // Load pixel data from image as Vector4 array (float normalized)
 
 //----------------------------------------------------------------------------------
@@ -249,13 +281,16 @@ Image LoadImage(const char *fileName)
 #endif
 
     // Loading file to memory
-    unsigned int fileSize = 0;
-    unsigned char *fileData = LoadFileData(fileName, &fileSize);
+    int dataSize = 0;
+    unsigned char *fileData = LoadFileData(fileName, &dataSize);
 
     // Loading image from memory data
-    if (fileData != NULL) image = LoadImageFromMemory(GetFileExtension(fileName), fileData, fileSize);
+    if (fileData != NULL)
+    {
+        image = LoadImageFromMemory(GetFileExtension(fileName), fileData, dataSize);
 
-    RL_FREE(fileData);
+        UnloadFileData(fileData);
+    }
 
     return image;
 }
@@ -265,24 +300,28 @@ Image LoadImageRaw(const char *fileName, int width, int height, int format, int 
 {
     Image image = { 0 };
 
-    unsigned int dataSize = 0;
+    int dataSize = 0;
     unsigned char *fileData = LoadFileData(fileName, &dataSize);
 
     if (fileData != NULL)
     {
         unsigned char *dataPtr = fileData;
-        unsigned int size = GetPixelDataSize(width, height, format);
+        int size = GetPixelDataSize(width, height, format);
 
-        if (headerSize > 0) dataPtr += headerSize;
+        if (size <= dataSize)   // Security check
+        {
+            // Offset file data to expected raw image by header size
+            if ((headerSize > 0) && ((headerSize + size) <= dataSize)) dataPtr += headerSize;
 
-        image.data = RL_MALLOC(size);      // Allocate required memory in bytes
-        memcpy(image.data, dataPtr, size); // Copy required data to image
-        image.width = width;
-        image.height = height;
-        image.mipmaps = 1;
-        image.format = format;
+            image.data = RL_MALLOC(size);      // Allocate required memory in bytes
+            memcpy(image.data, dataPtr, size); // Copy required data to image
+            image.width = width;
+            image.height = height;
+            image.mipmaps = 1;
+            image.format = format;
+        }
 
-        RL_FREE(fileData);
+        UnloadFileData(fileData);
     }
 
     return image;
@@ -301,7 +340,7 @@ Image LoadImageAnim(const char *fileName, int *frames)
 #if defined(SUPPORT_FILEFORMAT_GIF)
     if (IsFileExtension(fileName, ".gif"))
     {
-        unsigned int dataSize = 0;
+        int dataSize = 0;
         unsigned char *fileData = LoadFileData(fileName, &dataSize);
 
         if (fileData != NULL)
@@ -313,7 +352,7 @@ Image LoadImageAnim(const char *fileName, int *frames)
             image.mipmaps = 1;
             image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 
-            RL_FREE(fileData);
+            UnloadFileData(fileData);
             RL_FREE(delays);        // NOTE: Frames delays are discarded
         }
     }
@@ -326,7 +365,46 @@ Image LoadImageAnim(const char *fileName, int *frames)
         frameCount = 1;
     }
 
-    // TODO: Support APNG animated images
+    *frames = frameCount;
+    return image;
+}
+
+// Load animated image data
+//  - Image.data buffer includes all frames: [image#0][image#1][image#2][...]
+//  - Number of frames is returned through 'frames' parameter
+//  - All frames are returned in RGBA format
+//  - Frames delay data is discarded
+Image LoadImageAnimFromMemory(const char *fileType, const unsigned char *fileData, int dataSize, int *frames)
+{
+    Image image = { 0 };
+    int frameCount = 0;
+
+    // Security check for input data
+    if ((fileType == NULL) || (fileData == NULL) || (dataSize == 0)) return image;
+
+#if defined(SUPPORT_FILEFORMAT_GIF)
+    if ((strcmp(fileType, ".gif") == 0) || (strcmp(fileType, ".GIF") == 0))
+    {
+        if (fileData != NULL)
+        {
+            int comp = 0;
+            int *delays = NULL;
+            image.data = stbi_load_gif_from_memory(fileData, dataSize, &delays, &image.width, &image.height, &frameCount, &comp, 4);
+
+            image.mipmaps = 1;
+            image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+            RL_FREE(delays);        // NOTE: Frames delays are discarded
+        }
+    }
+#else
+    if (false) { }
+#endif
+    else
+    {
+        image = LoadImageFromMemory(fileType, fileData, dataSize);
+        frameCount = 1;
+    }
 
     *frames = frameCount;
     return image;
@@ -338,30 +416,44 @@ Image LoadImageFromMemory(const char *fileType, const unsigned char *fileData, i
 {
     Image image = { 0 };
 
+    // Security check for input data
+    if ((fileData == NULL) || (dataSize == 0))
+    {
+        TRACELOG(LOG_WARNING, "IMAGE: Invalid file data");
+        return image;
+    }
+    if (fileType == NULL)
+    {
+        TRACELOG(LOG_WARNING, "IMAGE: Missing file extension");
+        return image;
+    }
+
     if ((false)
 #if defined(SUPPORT_FILEFORMAT_PNG)
-        || (strcmp(fileType, ".png") == 0)
+        || (strcmp(fileType, ".png") == 0) || (strcmp(fileType, ".PNG") == 0)
 #endif
 #if defined(SUPPORT_FILEFORMAT_BMP)
-        || (strcmp(fileType, ".bmp") == 0)
+        || (strcmp(fileType, ".bmp") == 0) || (strcmp(fileType, ".BMP") == 0)
 #endif
 #if defined(SUPPORT_FILEFORMAT_TGA)
-        || (strcmp(fileType, ".tga") == 0)
+        || (strcmp(fileType, ".tga") == 0) || (strcmp(fileType, ".TGA") == 0)
 #endif
 #if defined(SUPPORT_FILEFORMAT_JPG)
-        || ((strcmp(fileType, ".jpg") == 0) || (strcmp(fileType, ".jpeg") == 0))
+        || (strcmp(fileType, ".jpg") == 0) || (strcmp(fileType, ".jpeg") == 0)
+        || (strcmp(fileType, ".JPG") == 0) || (strcmp(fileType, ".JPEG") == 0)
 #endif
 #if defined(SUPPORT_FILEFORMAT_GIF)
-        || (strcmp(fileType, ".gif") == 0)
+        || (strcmp(fileType, ".gif") == 0) || (strcmp(fileType, ".GIF") == 0)
 #endif
 #if defined(SUPPORT_FILEFORMAT_PIC)
-        || (strcmp(fileType, ".pic") == 0)
+        || (strcmp(fileType, ".pic") == 0) || (strcmp(fileType, ".PIC") == 0)
 #endif
 #if defined(SUPPORT_FILEFORMAT_PNM)
-        || ((strcmp(fileType, ".ppm") == 0) || (strcmp(fileType, ".pgm") == 0))
+        || (strcmp(fileType, ".ppm") == 0) || (strcmp(fileType, ".pgm") == 0)
+        || (strcmp(fileType, ".PPM") == 0) || (strcmp(fileType, ".PGM") == 0)
 #endif
 #if defined(SUPPORT_FILEFORMAT_PSD)
-        || (strcmp(fileType, ".psd") == 0)
+        || (strcmp(fileType, ".psd") == 0) || (strcmp(fileType, ".PSD") == 0)
 #endif
         )
     {
@@ -386,7 +478,7 @@ Image LoadImageFromMemory(const char *fileType, const unsigned char *fileData, i
 #endif
     }
 #if defined(SUPPORT_FILEFORMAT_HDR)
-    else if (strcmp(fileType, ".hdr") == 0)
+    else if ((strcmp(fileType, ".hdr") == 0) || (strcmp(fileType, ".HDR") == 0))
     {
 #if defined(STBI_REQUIRED)
         if (fileData != NULL)
@@ -409,42 +501,45 @@ Image LoadImageFromMemory(const char *fileType, const unsigned char *fileData, i
     }
 #endif
 #if defined(SUPPORT_FILEFORMAT_QOI)
-    else if (strcmp(fileType, ".qoi") == 0)
+    else if ((strcmp(fileType, ".qoi") == 0) || (strcmp(fileType, ".QOI") == 0))
     {
-        qoi_desc desc = { 0 };
-        image.data = qoi_decode(fileData, dataSize, &desc, 4);
-        image.width = desc.width;
-        image.height = desc.height;
-        image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-        image.mipmaps = 1;
+        if (fileData != NULL)
+        {
+            qoi_desc desc = { 0 };
+            image.data = qoi_decode(fileData, dataSize, &desc, (int) fileData[12]);
+            image.width = desc.width;
+            image.height = desc.height;
+            image.format = desc.channels == 4 ? PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 : PIXELFORMAT_UNCOMPRESSED_R8G8B8;
+            image.mipmaps = 1;
+        }
     }
 #endif
 #if defined(SUPPORT_FILEFORMAT_DDS)
-    else if (strcmp(fileType, ".dds") == 0)
+    else if ((strcmp(fileType, ".dds") == 0) || (strcmp(fileType, ".DDS") == 0))
     {
         image.data = rl_load_dds_from_memory(fileData, dataSize, &image.width, &image.height, &image.format, &image.mipmaps);
     }
 #endif
 #if defined(SUPPORT_FILEFORMAT_PKM)
-    else if (strcmp(fileType, ".pkm") == 0)
+    else if ((strcmp(fileType, ".pkm") == 0) || (strcmp(fileType, ".PKM") == 0))
     {
         image.data = rl_load_pkm_from_memory(fileData, dataSize, &image.width, &image.height, &image.format, &image.mipmaps);
     }
 #endif
 #if defined(SUPPORT_FILEFORMAT_KTX)
-    else if (strcmp(fileType, ".ktx") == 0)
+    else if ((strcmp(fileType, ".ktx") == 0) || (strcmp(fileType, ".KTX") == 0))
     {
         image.data = rl_load_ktx_from_memory(fileData, dataSize, &image.width, &image.height, &image.format, &image.mipmaps);
     }
 #endif
 #if defined(SUPPORT_FILEFORMAT_PVR)
-    else if (strcmp(fileType, ".pvr") == 0)
+    else if ((strcmp(fileType, ".pvr") == 0) || (strcmp(fileType, ".PVR") == 0))
     {
         image.data = rl_load_pvr_from_memory(fileData, dataSize, &image.width, &image.height, &image.format, &image.mipmaps);
     }
 #endif
 #if defined(SUPPORT_FILEFORMAT_ASTC)
-    else if (strcmp(fileType, ".astc") == 0)
+    else if ((strcmp(fileType, ".astc") == 0) || (strcmp(fileType, ".ASTC") == 0))
     {
         image.data = rl_load_astc_from_memory(fileData, dataSize, &image.width, &image.height, &image.format, &image.mipmaps);
     }
@@ -492,10 +587,11 @@ Image LoadImageFromTexture(Texture2D texture)
 // Load image from screen buffer and (screenshot)
 Image LoadImageFromScreen(void)
 {
+    Vector2 scale = GetWindowScaleDPI();
     Image image = { 0 };
 
-    image.width = GetScreenWidth();
-    image.height = GetScreenHeight();
+    image.width = (int)(GetScreenWidth()*scale.x);
+    image.height = (int)(GetScreenHeight()*scale.y);
     image.mipmaps = 1;
     image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
     image.data = rlReadScreenPixels(image.width, image.height);
@@ -504,13 +600,17 @@ Image LoadImageFromScreen(void)
 }
 
 // Check if an image is ready
-bool IsImageReady(Image image)
+bool IsImageValid(Image image)
 {
-    return ((image.data != NULL) &&     // Validate pixel data available
-            (image.width > 0) &&
-            (image.height > 0) &&       // Validate image size
-            (image.format > 0) &&       // Validate image format
-            (image.mipmaps > 0));       // Validate image mipmaps (at least 1 for basic mipmap level)
+    bool result = false;
+
+    if ((image.data != NULL) &&     // Validate pixel data available
+        (image.width > 0) &&        // Validate image width
+        (image.height > 0) &&       // Validate image height
+        (image.format > 0) &&       // Validate image format
+        (image.mipmaps > 0)) result = true; // Validate image mipmaps (at least 1 for basic mipmap level)
+
+    return result;
 }
 
 // Unload image from CPU memory (RAM)
@@ -523,7 +623,10 @@ void UnloadImage(Image image)
 // NOTE: File format depends on fileName extension
 bool ExportImage(Image image, const char *fileName)
 {
-    int success = 0;
+    int result = 0;
+
+    // Security check for input data
+    if ((image.width == 0) || (image.height == 0) || (image.data == NULL)) return result;
 
 #if defined(SUPPORT_IMAGE_EXPORT)
     int channels = 4;
@@ -546,21 +649,21 @@ bool ExportImage(Image image, const char *fileName)
     {
         int dataSize = 0;
         unsigned char *fileData = stbi_write_png_to_mem((const unsigned char *)imgData, image.width*channels, image.width, image.height, channels, &dataSize);
-        success = SaveFileData(fileName, fileData, dataSize);
+        result = SaveFileData(fileName, fileData, dataSize);
         RL_FREE(fileData);
     }
 #else
     if (false) { }
 #endif
 #if defined(SUPPORT_FILEFORMAT_BMP)
-    else if (IsFileExtension(fileName, ".bmp")) success = stbi_write_bmp(fileName, image.width, image.height, channels, imgData);
+    else if (IsFileExtension(fileName, ".bmp")) result = stbi_write_bmp(fileName, image.width, image.height, channels, imgData);
 #endif
 #if defined(SUPPORT_FILEFORMAT_TGA)
-    else if (IsFileExtension(fileName, ".tga")) success = stbi_write_tga(fileName, image.width, image.height, channels, imgData);
+    else if (IsFileExtension(fileName, ".tga")) result = stbi_write_tga(fileName, image.width, image.height, channels, imgData);
 #endif
 #if defined(SUPPORT_FILEFORMAT_JPG)
     else if (IsFileExtension(fileName, ".jpg") ||
-             IsFileExtension(fileName, ".jpeg")) success = stbi_write_jpg(fileName, image.width, image.height, channels, imgData, 90);  // JPG quality: between 1 and 100
+             IsFileExtension(fileName, ".jpeg")) result = stbi_write_jpg(fileName, image.width, image.height, channels, imgData, 90);  // JPG quality: between 1 and 100
 #endif
 #if defined(SUPPORT_FILEFORMAT_QOI)
     else if (IsFileExtension(fileName, ".qoi"))
@@ -578,30 +681,59 @@ bool ExportImage(Image image, const char *fileName)
             desc.channels = channels;
             desc.colorspace = QOI_SRGB;
 
-            success = qoi_write(fileName, imgData, &desc);
+            result = qoi_write(fileName, imgData, &desc);
         }
     }
 #endif
 #if defined(SUPPORT_FILEFORMAT_KTX)
     else if (IsFileExtension(fileName, ".ktx"))
     {
-        success = rl_save_ktx(fileName, image.data, image.width, image.height, image.format, image.mipmaps);
+        result = rl_save_ktx(fileName, image.data, image.width, image.height, image.format, image.mipmaps);
     }
 #endif
     else if (IsFileExtension(fileName, ".raw"))
     {
         // Export raw pixel data (without header)
         // NOTE: It's up to the user to track image parameters
-        success = SaveFileData(fileName, image.data, GetPixelDataSize(image.width, image.height, image.format));
+        result = SaveFileData(fileName, image.data, GetPixelDataSize(image.width, image.height, image.format));
     }
 
     if (allocatedData) RL_FREE(imgData);
 #endif      // SUPPORT_IMAGE_EXPORT
 
-    if (success != 0) TRACELOG(LOG_INFO, "FILEIO: [%s] Image exported successfully", fileName);
+    if (result != 0) TRACELOG(LOG_INFO, "FILEIO: [%s] Image exported successfully", fileName);
     else TRACELOG(LOG_WARNING, "FILEIO: [%s] Failed to export image", fileName);
 
-    return success;
+    return result;
+}
+
+// Export image to memory buffer
+unsigned char *ExportImageToMemory(Image image, const char *fileType, int *dataSize)
+{
+    unsigned char *fileData = NULL;
+    *dataSize = 0;
+
+    // Security check for input data
+    if ((image.width == 0) || (image.height == 0) || (image.data == NULL)) return NULL;
+
+#if defined(SUPPORT_IMAGE_EXPORT)
+    int channels = 4;
+
+    if (image.format == PIXELFORMAT_UNCOMPRESSED_GRAYSCALE) channels = 1;
+    else if (image.format == PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA) channels = 2;
+    else if (image.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8) channels = 3;
+    else if (image.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) channels = 4;
+
+#if defined(SUPPORT_FILEFORMAT_PNG)
+    if ((strcmp(fileType, ".png") == 0) || (strcmp(fileType, ".PNG") == 0))
+    {
+        fileData = stbi_write_png_to_mem((const unsigned char *)image.data, image.width*channels, image.width, image.height, channels, dataSize);
+    }
+#endif
+
+#endif
+
+    return fileData;
 }
 
 // Export image as code file (.h) defining an array of bytes
@@ -629,7 +761,7 @@ bool ExportImageAsCode(Image image, const char *fileName)
     byteCount += sprintf(txtData + byteCount, "// more info and bugs-report:  github.com/raysan5/raylib                              //\n");
     byteCount += sprintf(txtData + byteCount, "// feedback and support:       ray[at]raylib.com                                      //\n");
     byteCount += sprintf(txtData + byteCount, "//                                                                                    //\n");
-    byteCount += sprintf(txtData + byteCount, "// Copyright (c) 2018-2023 Ramon Santamaria (@raysan5)                                //\n");
+    byteCount += sprintf(txtData + byteCount, "// Copyright (c) 2018-2024 Ramon Santamaria (@raysan5)                                //\n");
     byteCount += sprintf(txtData + byteCount, "//                                                                                    //\n");
     byteCount += sprintf(txtData + byteCount, "////////////////////////////////////////////////////////////////////////////////////////\n\n");
 
@@ -683,48 +815,45 @@ Image GenImageColor(int width, int height, Color color)
 }
 
 #if defined(SUPPORT_IMAGE_GENERATION)
-// Generate image: vertical gradient
-Image GenImageGradientV(int width, int height, Color top, Color bottom)
+// Generate image: linear gradient
+// The direction value specifies the direction of the gradient (in degrees)
+// with 0 being vertical (from top to bottom), 90 being horizontal (from left to right)
+// The gradient effectively rotates counter-clockwise by the specified amount
+Image GenImageGradientLinear(int width, int height, int direction, Color start, Color end)
 {
     Color *pixels = (Color *)RL_MALLOC(width*height*sizeof(Color));
 
-    for (int j = 0; j < height; j++)
-    {
-        float factor = (float)j/(float)height;
-        for (int i = 0; i < width; i++)
-        {
-            pixels[j*width + i].r = (int)((float)bottom.r*factor + (float)top.r*(1.f - factor));
-            pixels[j*width + i].g = (int)((float)bottom.g*factor + (float)top.g*(1.f - factor));
-            pixels[j*width + i].b = (int)((float)bottom.b*factor + (float)top.b*(1.f - factor));
-            pixels[j*width + i].a = (int)((float)bottom.a*factor + (float)top.a*(1.f - factor));
-        }
-    }
+    float radianDirection = (float)(90 - direction)/180.f*3.14159f;
+    float cosDir = cosf(radianDirection);
+    float sinDir = sinf(radianDirection);
 
-    Image image = {
-        .data = pixels,
-        .width = width,
-        .height = height,
-        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
-        .mipmaps = 1
-    };
-
-    return image;
-}
-
-// Generate image: horizontal gradient
-Image GenImageGradientH(int width, int height, Color left, Color right)
-{
-    Color *pixels = (Color *)RL_MALLOC(width*height*sizeof(Color));
-
+    // Calculate how far the top-left pixel is along the gradient direction from the center of said gradient
+    float startingPos = 0.5f - (cosDir*width/2) - (sinDir*height/2);
+    // With directions that lie in the first or third quadrant (i.e. from top-left to 
+    // bottom-right or vice-versa), pixel (0, 0) is the farthest point on the gradient
+    // (i.e. the pixel which should become one of the gradient's ends color); while for
+    // directions that lie in the second or fourth quadrant, that point is pixel (width, 0).
+    float maxPosValue = 
+            ((signbit(sinDir) != 0) == (signbit(cosDir) != 0))
+            ? fabsf(startingPos)
+            : fabsf(startingPos+width*cosDir);
     for (int i = 0; i < width; i++)
     {
-        float factor = (float)i/(float)width;
         for (int j = 0; j < height; j++)
         {
-            pixels[j*width + i].r = (int)((float)right.r*factor + (float)left.r*(1.f - factor));
-            pixels[j*width + i].g = (int)((float)right.g*factor + (float)left.g*(1.f - factor));
-            pixels[j*width + i].b = (int)((float)right.b*factor + (float)left.b*(1.f - factor));
-            pixels[j*width + i].a = (int)((float)right.a*factor + (float)left.a*(1.f - factor));
+            // Calculate the relative position of the pixel along the gradient direction
+            float pos = (startingPos + (i*cosDir + j*sinDir)) / maxPosValue;
+
+            float factor = pos;
+            factor = (factor > 1.0f)? 1.0f : factor;  // Clamp to [-1,1]
+            factor = (factor < -1.0f)? -1.0f : factor;  // Clamp to [-1,1]
+            factor = factor / 2 + 0.5f;
+
+            // Generate the color for this pixel
+            pixels[j*width + i].r = (int)((float)end.r*factor + (float)start.r*(1.0f - factor));
+            pixels[j*width + i].g = (int)((float)end.g*factor + (float)start.g*(1.0f - factor));
+            pixels[j*width + i].b = (int)((float)end.b*factor + (float)start.b*(1.0f - factor));
+            pixels[j*width + i].a = (int)((float)end.a*factor + (float)start.a*(1.0f - factor));
         }
     }
 
@@ -776,6 +905,55 @@ Image GenImageGradientRadial(int width, int height, float density, Color inner, 
     return image;
 }
 
+// Generate image: square gradient
+Image GenImageGradientSquare(int width, int height, float density, Color inner, Color outer)
+{
+    Color *pixels = (Color *)RL_MALLOC(width*height*sizeof(Color));
+
+    float centerX = (float)width/2.0f;
+    float centerY = (float)height/2.0f;
+
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            // Calculate the Manhattan distance from the center
+            float distX = fabsf(x - centerX);
+            float distY = fabsf(y - centerY);
+
+            // Normalize the distances by the dimensions of the gradient rectangle
+            float normalizedDistX = distX/centerX;
+            float normalizedDistY = distY/centerY;
+
+            // Calculate the total normalized Manhattan distance
+            float manhattanDist = fmaxf(normalizedDistX, normalizedDistY);
+
+            // Subtract the density from the manhattanDist, then divide by (1 - density)
+            // This makes the gradient start from the center when density is 0, and from the edge when density is 1
+            float factor = (manhattanDist - density)/(1.0f - density);
+
+            // Clamp the factor between 0 and 1
+            factor = fminf(fmaxf(factor, 0.0f), 1.0f);
+
+            // Blend the colors based on the calculated factor
+            pixels[y*width + x].r = (int)((float)outer.r*factor + (float)inner.r*(1.0f - factor));
+            pixels[y*width + x].g = (int)((float)outer.g*factor + (float)inner.g*(1.0f - factor));
+            pixels[y*width + x].b = (int)((float)outer.b*factor + (float)inner.b*(1.0f - factor));
+            pixels[y*width + x].a = (int)((float)outer.a*factor + (float)inner.a*(1.0f - factor));
+        }
+    }
+
+    Image image = {
+        .data = pixels,
+        .width = width,
+        .height = height,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+        .mipmaps = 1
+    };
+
+    return image;
+}
+
 // Generate image: checked
 Image GenImageChecked(int width, int height, int checksX, int checksY, Color col1, Color col2)
 {
@@ -802,6 +980,7 @@ Image GenImageChecked(int width, int height, int checksX, int checksY, Color col
 }
 
 // Generate image: white noise
+// NOTE: It requires GetRandomValue(), defined in [rcore]
 Image GenImageWhiteNoise(int width, int height, float factor)
 {
     Color *pixels = (Color *)RL_MALLOC(width*height*sizeof(Color));
@@ -828,22 +1007,36 @@ Image GenImagePerlinNoise(int width, int height, int offsetX, int offsetY, float
 {
     Color *pixels = (Color *)RL_MALLOC(width*height*sizeof(Color));
 
+    float aspectRatio = (float)width / (float)height;
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
         {
-            float nx = (float)(x + offsetX)*scale/(float)width;
-            float ny = (float)(y + offsetY)*scale/(float)height;
+            float nx = (float)(x + offsetX)*(scale/(float)width);
+            float ny = (float)(y + offsetY)*(scale/(float)height);
 
+            // Apply aspect ratio compensation to wider side
+            if (width > height) nx *= aspectRatio;
+            else ny /= aspectRatio;
+
+            // Basic perlin noise implementation (not used)
+            //float p = (stb_perlin_noise3(nx, ny, 0.0f, 0, 0, 0);
+
+            // Calculate a better perlin noise using fbm (fractal brownian motion)
             // Typical values to start playing with:
             //   lacunarity = ~2.0   -- spacing between successive octaves (use exactly 2.0 for wrapping output)
             //   gain       =  0.5   -- relative weighting applied to each successive octave
             //   octaves    =  6     -- number of "octaves" of noise3() to sum
+            float p = stb_perlin_fbm_noise3(nx, ny, 1.0f, 2.0f, 0.5f, 6);
 
-            // NOTE: We need to translate the data from [-1..1] to [0..1]
-            float p = (stb_perlin_fbm_noise3(nx, ny, 1.0f, 2.0f, 0.5f, 6) + 1.0f)/2.0f;
+            // Clamp between -1.0f and 1.0f
+            if (p < -1.0f) p = -1.0f;
+            if (p > 1.0f) p = 1.0f;
 
-            int intensity = (int)(p*255.0f);
+            // We need to normalize the data from [-1..1] to [0..1]
+            float np = (p + 1.0f)/2.0f;
+
+            int intensity = (int)(np*255.0f);
             pixels[y*width + x] = (Color){ intensity, intensity, intensity, 255 };
         }
     }
@@ -929,7 +1122,7 @@ Image GenImageText(int width, int height, const char *text)
 {
     Image image = { 0 };
 
-    int textLength = TextLength(text);
+    int textLength = (int)strlen(text);
     int imageViewSize = width*height;
 
     image.width = width;
@@ -968,7 +1161,7 @@ Image ImageCopy(Image image)
         if (height < 1) height = 1;
     }
 
-    newImage.data = RL_MALLOC(size);
+    newImage.data = RL_CALLOC(size, 1);
 
     if (newImage.data != NULL)
     {
@@ -1073,8 +1266,6 @@ void ImageFormat(Image *image, int newFormat)
             image->data = NULL;
             image->format = newFormat;
 
-            int k = 0;
-
             switch (image->format)
             {
                 case PIXELFORMAT_UNCOMPRESSED_GRAYSCALE:
@@ -1091,7 +1282,7 @@ void ImageFormat(Image *image, int newFormat)
                 {
                     image->data = (unsigned char *)RL_MALLOC(image->width*image->height*2*sizeof(unsigned char));
 
-                    for (int i = 0; i < image->width*image->height*2; i += 2, k++)
+                    for (int i = 0, k = 0; i < image->width*image->height*2; i += 2, k++)
                     {
                         ((unsigned char *)image->data)[i] = (unsigned char)((pixels[k].x*0.299f + (float)pixels[k].y*0.587f + (float)pixels[k].z*0.114f)*255.0f);
                         ((unsigned char *)image->data)[i + 1] = (unsigned char)(pixels[k].w*255.0f);
@@ -1213,6 +1404,40 @@ void ImageFormat(Image *image, int newFormat)
                         ((float *)image->data)[i + 3] = pixels[k].w;
                     }
                 } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16:
+                {
+                    // WARNING: Image is converted to GRAYSCALE equivalent 16bit
+
+                    image->data = (unsigned short *)RL_MALLOC(image->width*image->height*sizeof(unsigned short));
+
+                    for (int i = 0; i < image->width*image->height; i++)
+                    {
+                        ((unsigned short *)image->data)[i] = FloatToHalf((float)(pixels[i].x*0.299f + pixels[i].y*0.587f + pixels[i].z*0.114f));
+                    }
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16:
+                {
+                    image->data = (unsigned short *)RL_MALLOC(image->width*image->height*3*sizeof(unsigned short));
+
+                    for (int i = 0, k = 0; i < image->width*image->height*3; i += 3, k++)
+                    {
+                        ((unsigned short *)image->data)[i] = FloatToHalf(pixels[k].x);
+                        ((unsigned short *)image->data)[i + 1] = FloatToHalf(pixels[k].y);
+                        ((unsigned short *)image->data)[i + 2] = FloatToHalf(pixels[k].z);
+                    }
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                {
+                    image->data = (unsigned short *)RL_MALLOC(image->width*image->height*4*sizeof(unsigned short));
+
+                    for (int i = 0, k = 0; i < image->width*image->height*4; i += 4, k++)
+                    {
+                        ((unsigned short *)image->data)[i] = FloatToHalf(pixels[k].x);
+                        ((unsigned short *)image->data)[i + 1] = FloatToHalf(pixels[k].y);
+                        ((unsigned short *)image->data)[i + 2] = FloatToHalf(pixels[k].z);
+                        ((unsigned short *)image->data)[i + 3] = FloatToHalf(pixels[k].w);
+                    }
+                } break;
                 default: break;
             }
 
@@ -1250,6 +1475,7 @@ Image ImageText(const char *text, int fontSize, Color color)
 }
 
 // Create an image from text (custom sprite font)
+// WARNING: Module required: rtext
 Image ImageTextEx(Font font, const char *text, float fontSize, float spacing, Color tint)
 {
     Image imText = { 0 };
@@ -1266,16 +1492,12 @@ Image ImageTextEx(Font font, const char *text, float fontSize, float spacing, Co
     // Create image to store text
     imText = GenImageColor((int)imSize.x, (int)imSize.y, BLANK);
 
-    for (int i = 0; i < size; i++)
+    for (int i = 0; i < size;)
     {
         // Get next codepoint from byte string and glyph index in font
         int codepointByteCount = 0;
         int codepoint = GetCodepointNext(&text[i], &codepointByteCount);    // WARNING: Module required: rtext
         int index = GetGlyphIndex(font, codepoint);                         // WARNING: Module required: rtext
-
-        // NOTE: Normally we exit the decoding sequence as soon as a bad byte is found (and return 0x3f)
-        // but we need to draw all the bad bytes using the '?' symbol moving one byte
-        if (codepoint == 0x3f) codepointByteCount = 1;
 
         if (codepoint == '\n')
         {
@@ -1296,18 +1518,17 @@ Image ImageTextEx(Font font, const char *text, float fontSize, float spacing, Co
             else textOffsetX += font.glyphs[index].advanceX + (int)spacing;
         }
 
-        i += (codepointByteCount - 1);   // Move text bytes counter to next codepoint
+        i += codepointByteCount;   // Move text bytes counter to next codepoint
     }
 
     // Scale image depending on text size
     if (textSize.y != imSize.y)
     {
-        float scaleFactor = textSize.y / imSize.y;
+        float scaleFactor = textSize.y/imSize.y;
         TRACELOG(LOG_INFO, "IMAGE: Text scaled by factor: %f", scaleFactor);
 
         // Using nearest-neighbor scaling algorithm for default font
         // TODO: Allow defining the preferred scaling mechanism externally
-        // WARNING: Module required: rtext
         if (font.texture.id == GetFontDefault().texture.id) ImageResizeNN(&imText, (int)(imSize.x*scaleFactor), (int)(imSize.y*scaleFactor));
         else ImageResize(&imText, (int)(imSize.x*scaleFactor), (int)(imSize.y*scaleFactor));
     }
@@ -1316,6 +1537,174 @@ Image ImageTextEx(Font font, const char *text, float fontSize, float spacing, Co
     TRACELOG(LOG_WARNING, "IMAGE: ImageTextEx() requires module: rtext");
 #endif
     return imText;
+}
+
+// Create an image from a selected channel of another image
+Image ImageFromChannel(Image image, int selectedChannel)
+{
+    Image result = { 0 };
+
+    // Security check to avoid program crash
+    if ((image.data == NULL) || (image.width == 0) || (image.height == 0)) return result;
+
+    // Check selected channel is valid
+    if (selectedChannel < 0)
+    {
+        TRACELOG(LOG_WARNING, "Channel cannot be negative. Setting channel to 0.");
+        selectedChannel = 0;
+    }
+
+    if (image.format == PIXELFORMAT_UNCOMPRESSED_GRAYSCALE ||
+        image.format == PIXELFORMAT_UNCOMPRESSED_R32 ||
+        image.format == PIXELFORMAT_UNCOMPRESSED_R16)
+    {
+        if (selectedChannel > 0)
+        {
+            TRACELOG(LOG_WARNING, "This image has only 1 channel. Setting channel to it.");
+            selectedChannel = 0;
+        }
+    }
+    else if (image.format == PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA)
+    {
+        if (selectedChannel > 1)
+        {
+            TRACELOG(LOG_WARNING, "This image has only 2 channels. Setting channel to alpha.");
+            selectedChannel = 1;
+        }
+    }
+    else if (image.format == PIXELFORMAT_UNCOMPRESSED_R5G6B5 ||
+             image.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8 ||
+             image.format == PIXELFORMAT_UNCOMPRESSED_R32G32B32 ||
+             image.format == PIXELFORMAT_UNCOMPRESSED_R16G16B16)
+    {
+        if (selectedChannel > 2)
+        {
+            TRACELOG(LOG_WARNING, "This image has only 3 channels. Setting channel to red.");
+            selectedChannel = 0;
+        }
+    }
+
+    // Check for RGBA formats
+    if (selectedChannel > 3)
+    {
+        TRACELOG(LOG_WARNING, "ImageFromChannel supports channels 0 to 3 (rgba). Setting channel to alpha.");
+        selectedChannel = 3;
+    }
+
+    // TODO: Consider other one-channel formats: R16, R32
+    result.format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE;
+    result.height = image.height;
+    result.width = image.width;
+    result.mipmaps = 1;
+
+    unsigned char *pixels = (unsigned char *)RL_CALLOC(image.width*image.height, sizeof(unsigned char)); // Values from 0 to 255
+
+    if (image.format >= PIXELFORMAT_COMPRESSED_DXT1_RGB) TRACELOG(LOG_WARNING, "IMAGE: Pixel data retrieval not supported for compressed image formats");
+    else
+    {
+        for (int i = 0, k = 0; i < image.width*image.height; i++)
+        {
+            float pixelValue = -1;
+            switch (image.format)
+            {
+                case PIXELFORMAT_UNCOMPRESSED_GRAYSCALE:
+                {
+                    pixelValue = (float)((unsigned char *)image.data)[i + selectedChannel]/255.0f;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA:
+                {
+                    pixelValue = (float)((unsigned char *)image.data)[k + selectedChannel]/255.0f;
+                    k += 2;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R5G5B5A1:
+                {
+                    unsigned short pixel = ((unsigned short *)image.data)[i];
+
+                    if (selectedChannel == 0) pixelValue = (float)((pixel & 0b1111100000000000) >> 11)*(1.0f/31);
+                    else if (selectedChannel == 1) pixelValue = (float)((pixel & 0b0000011111000000) >> 6)*(1.0f/31);
+                    else if (selectedChannel == 2) pixelValue = (float)((pixel & 0b0000000000111110) >> 1)*(1.0f/31);
+                    else if (selectedChannel == 3) pixelValue = ((pixel & 0b0000000000000001) == 0)? 0.0f : 1.0f;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R5G6B5:
+                {
+                    unsigned short pixel = ((unsigned short *)image.data)[i];
+
+                    if (selectedChannel == 0) pixelValue = (float)((pixel & 0b1111100000000000) >> 11)*(1.0f/31);
+                    else if (selectedChannel == 1) pixelValue = (float)((pixel & 0b0000011111100000) >> 5)*(1.0f/63);
+                    else if (selectedChannel == 2) pixelValue = (float)(pixel & 0b0000000000011111)*(1.0f/31);
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R4G4B4A4:
+                {
+                    unsigned short pixel = ((unsigned short *)image.data)[i];
+
+                    if (selectedChannel == 0) pixelValue = (float)((pixel & 0b1111000000000000) >> 12)*(1.0f/15);
+                    else if (selectedChannel == 1) pixelValue = (float)((pixel & 0b0000111100000000) >> 8)*(1.0f/15);
+                    else if (selectedChannel == 2) pixelValue = (float)((pixel & 0b0000000011110000) >> 4)*(1.0f/15);
+                    else if (selectedChannel == 3) pixelValue = (float)(pixel & 0b0000000000001111)*(1.0f/15);
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                {
+                    pixelValue = (float)((unsigned char *)image.data)[k + selectedChannel]/255.0f;
+                    k += 4;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R8G8B8:
+                {
+                    pixelValue = (float)((unsigned char *)image.data)[k + selectedChannel]/255.0f;
+                    k += 3;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R32:
+                {
+                    pixelValue = ((float *)image.data)[k];
+                    k += 1;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R32G32B32:
+                {
+                    pixelValue = ((float *)image.data)[k + selectedChannel];
+                    k += 3;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                {
+                    pixelValue = ((float *)image.data)[k + selectedChannel];
+                    k += 4;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16:
+                {
+                    pixelValue = HalfToFloat(((unsigned short *)image.data)[k]);
+                    k += 1;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16:
+                {
+                    pixelValue = HalfToFloat(((unsigned short *)image.data)[k+selectedChannel]);
+                    k += 3;
+
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                {
+                    pixelValue = HalfToFloat(((unsigned short *)image.data)[k + selectedChannel]);
+                    k += 4;
+
+                } break;
+                default: break;
+            }
+
+            pixels[i] = (unsigned char)(pixelValue*255);
+        }
+    }
+
+    result.data = pixels;
+
+    return result;
 }
 
 // Resize and image to new size using Nearest-Neighbor scaling algorithm
@@ -1357,7 +1746,6 @@ void ImageResizeNN(Image *image,int newWidth,int newHeight)
     UnloadImageColors(pixels);
 }
 
-
 // Resize and image to new size
 // NOTE: Uses stb default scaling filters (both bicubic):
 // STBIR_DEFAULT_FILTER_UPSAMPLE    STBIR_FILTER_CATMULLROM
@@ -1379,10 +1767,10 @@ void ImageResize(Image *image, int newWidth, int newHeight)
 
         switch (image->format)
         {
-            case PIXELFORMAT_UNCOMPRESSED_GRAYSCALE: stbir_resize_uint8((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, 1); break;
-            case PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA: stbir_resize_uint8((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, 2); break;
-            case PIXELFORMAT_UNCOMPRESSED_R8G8B8: stbir_resize_uint8((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, 3); break;
-            case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8: stbir_resize_uint8((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, 4); break;
+            case PIXELFORMAT_UNCOMPRESSED_GRAYSCALE: stbir_resize_uint8_linear((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, (stbir_pixel_layout)1); break;
+            case PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA: stbir_resize_uint8_linear((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, (stbir_pixel_layout)2); break;
+            case PIXELFORMAT_UNCOMPRESSED_R8G8B8: stbir_resize_uint8_linear((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, (stbir_pixel_layout)3); break;
+            case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8: stbir_resize_uint8_linear((unsigned char *)image->data, image->width, image->height, 0, output, newWidth, newHeight, 0, (stbir_pixel_layout)4); break;
             default: break;
         }
 
@@ -1398,7 +1786,7 @@ void ImageResize(Image *image, int newWidth, int newHeight)
         Color *output = (Color *)RL_MALLOC(newWidth*newHeight*sizeof(Color));
 
         // NOTE: Color data is cast to (unsigned char *), there shouldn't been any problem...
-        stbir_resize_uint8((unsigned char *)pixels, image->width, image->height, 0, (unsigned char *)output, newWidth, newHeight, 0, 4);
+        stbir_resize_uint8_linear((unsigned char *)pixels, image->width, image->height, 0, (unsigned char *)output, newWidth, newHeight, 0, (stbir_pixel_layout)4);
 
         int format = image->format;
 
@@ -1450,8 +1838,22 @@ void ImageResizeCanvas(Image *image, int newWidth, int newHeight, int offsetX, i
         int bytesPerPixel = GetPixelDataSize(1, 1, image->format);
         unsigned char *resizedData = (unsigned char *)RL_CALLOC(newWidth*newHeight*bytesPerPixel, 1);
 
-        // TODO: Fill resized canvas with fill color (must be formatted to image->format)
+        // Fill resized canvas with fill color
+        // Set first pixel with image->format
+        SetPixelColor(resizedData, fill, image->format);
 
+        // Fill remaining bytes of first row
+        for (int x = 1; x < newWidth; x++)
+        {
+            memcpy(resizedData + x*bytesPerPixel, resizedData, bytesPerPixel);
+        }
+        // Copy the first row into the other rows
+        for (int y = 1; y < newHeight; y++)
+        {
+            memcpy(resizedData + y*newWidth*bytesPerPixel, resizedData, newWidth*bytesPerPixel);
+        }
+
+        // Copy old image to resized canvas
         int dstOffsetSize = ((int)dstPos.y*newWidth + (int)dstPos.x)*bytesPerPixel;
 
         for (int y = 0; y < (int)srcRec.height; y++)
@@ -1583,6 +1985,19 @@ void ImageAlphaClear(Image *image, Color color, float threshold)
                     }
                 }
             } break;
+            case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+            {
+                for (int i = 3; i < image->width*image->height*4; i += 4)
+                {
+                    if (HalfToFloat(((unsigned short *)image->data)[i]) <= threshold)
+                    {
+                        ((unsigned short *)image->data)[i - 3] = FloatToHalf((float)color.r/255.0f);
+                        ((unsigned short *)image->data)[i - 2] = FloatToHalf((float)color.g/255.0f);
+                        ((unsigned short *)image->data)[i - 1] = FloatToHalf((float)color.b/255.0f);
+                        ((unsigned short *)image->data)[i] = FloatToHalf((float)color.a/255.0f);
+                    }
+                }
+            } break;
             default: break;
         }
     }
@@ -1674,8 +2089,9 @@ void ImageAlphaPremultiply(Image *image)
     ImageFormat(image, format);
 }
 
-// Apply box blur
-void ImageBlurGaussian(Image *image, int blurSize) {
+// Apply box blur to image
+void ImageBlurGaussian(Image *image, int blurSize)
+{
     // Security check to avoid program crash
     if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
 
@@ -1687,7 +2103,8 @@ void ImageBlurGaussian(Image *image, int blurSize) {
     Vector4 *pixelsCopy1 = RL_MALLOC((image->height)*(image->width)*sizeof(Vector4));
     Vector4 *pixelsCopy2 = RL_MALLOC((image->height)*(image->width)*sizeof(Vector4));
 
-    for (int i = 0; i < (image->height)*(image->width); i++) {
+    for (int i = 0; i < (image->height*image->width); i++)
+    {
         pixelsCopy1[i].x = pixels[i].r;
         pixelsCopy1[i].y = pixels[i].g;
         pixelsCopy1[i].z = pixels[i].b;
@@ -1695,7 +2112,8 @@ void ImageBlurGaussian(Image *image, int blurSize) {
     }
 
     // Repeated convolution of rectangular window signal by itself converges to a gaussian distribution
-    for (int j = 0; j < GAUSSIAN_BLUR_ITERATIONS; j++) {
+    for (int j = 0; j < GAUSSIAN_BLUR_ITERATIONS; j++)
+    {
         // Horizontal motion blur
         for (int row = 0; row < image->height; row++)
         {
@@ -1703,9 +2121,9 @@ void ImageBlurGaussian(Image *image, int blurSize) {
             float avgG = 0.0f;
             float avgB = 0.0f;
             float avgAlpha = 0.0f;
-            int convolutionSize = blurSize+1;
+            int convolutionSize = blurSize;
 
-            for (int i = 0; i < blurSize+1; i++)
+            for (int i = 0; i < blurSize; i++)
             {
                 avgR += pixelsCopy1[row*image->width + i].x;
                 avgG += pixelsCopy1[row*image->width + i].y;
@@ -1713,19 +2131,14 @@ void ImageBlurGaussian(Image *image, int blurSize) {
                 avgAlpha += pixelsCopy1[row*image->width + i].w;
             }
 
-            pixelsCopy2[row*image->width].x = avgR/convolutionSize;
-            pixelsCopy2[row*image->width].y = avgG/convolutionSize;
-            pixelsCopy2[row*image->width].z = avgB/convolutionSize;
-            pixelsCopy2[row*image->width].w = avgAlpha/convolutionSize;
-
-            for (int x = 1; x < image->width; x++)
+            for (int x = 0; x < image->width; x++)
             {
-                if (x-blurSize >= 0)
+                if (x-blurSize-1 >= 0)
                 {
-                    avgR -= pixelsCopy1[row*image->width + x-blurSize].x;
-                    avgG -= pixelsCopy1[row*image->width + x-blurSize].y;
-                    avgB -= pixelsCopy1[row*image->width + x-blurSize].z;
-                    avgAlpha -= pixelsCopy1[row*image->width + x-blurSize].w;
+                    avgR -= pixelsCopy1[row*image->width + x-blurSize-1].x;
+                    avgG -= pixelsCopy1[row*image->width + x-blurSize-1].y;
+                    avgB -= pixelsCopy1[row*image->width + x-blurSize-1].z;
+                    avgAlpha -= pixelsCopy1[row*image->width + x-blurSize-1].w;
                     convolutionSize--;
                 }
 
@@ -1743,7 +2156,7 @@ void ImageBlurGaussian(Image *image, int blurSize) {
                 pixelsCopy2[row*image->width + x].z = avgB/convolutionSize;
                 pixelsCopy2[row*image->width + x].w = avgAlpha/convolutionSize;
             }
-                }
+        }
 
         // Vertical motion blur
         for (int col = 0; col < image->width; col++)
@@ -1752,9 +2165,9 @@ void ImageBlurGaussian(Image *image, int blurSize) {
             float avgG = 0.0f;
             float avgB = 0.0f;
             float avgAlpha = 0.0f;
-            int convolutionSize = blurSize+1;
+            int convolutionSize = blurSize;
 
-            for (int i = 0; i < blurSize+1; i++)
+            for (int i = 0; i < blurSize; i++)
             {
                 avgR += pixelsCopy2[i*image->width + col].x;
                 avgG += pixelsCopy2[i*image->width + col].y;
@@ -1762,19 +2175,14 @@ void ImageBlurGaussian(Image *image, int blurSize) {
                 avgAlpha += pixelsCopy2[i*image->width + col].w;
             }
 
-            pixelsCopy1[col].x = (unsigned char) (avgR/convolutionSize);
-            pixelsCopy1[col].y = (unsigned char) (avgG/convolutionSize);
-            pixelsCopy1[col].z = (unsigned char) (avgB/convolutionSize);
-            pixelsCopy1[col].w = (unsigned char) (avgAlpha/convolutionSize);
-
-            for (int y = 1; y < image->height; y++)
+            for (int y = 0; y < image->height; y++)
             {
-                if (y-blurSize >= 0)
+                if (y-blurSize-1 >= 0)
                 {
-                    avgR -= pixelsCopy2[(y-blurSize)*image->width + col].x;
-                    avgG -= pixelsCopy2[(y-blurSize)*image->width + col].y;
-                    avgB -= pixelsCopy2[(y-blurSize)*image->width + col].z;
-                    avgAlpha -= pixelsCopy2[(y-blurSize)*image->width + col].w;
+                    avgR -= pixelsCopy2[(y-blurSize-1)*image->width + col].x;
+                    avgG -= pixelsCopy2[(y-blurSize-1)*image->width + col].y;
+                    avgB -= pixelsCopy2[(y-blurSize-1)*image->width + col].z;
+                    avgAlpha -= pixelsCopy2[(y-blurSize-1)*image->width + col].w;
                     convolutionSize--;
                 }
                 if (y+blurSize < image->height)
@@ -1793,7 +2201,6 @@ void ImageBlurGaussian(Image *image, int blurSize) {
             }
         }
     }
-
 
     // Reverse premultiply
     for (int i = 0; i < (image->width)*(image->height); i++)
@@ -1823,6 +2230,136 @@ void ImageBlurGaussian(Image *image, int blurSize) {
     image->data = pixels;
     image->format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 
+    ImageFormat(image, format);
+}
+
+// Apply custom square convolution kernel to image
+// NOTE: The convolution kernel matrix is expected to be square
+void ImageKernelConvolution(Image *image, const float *kernel, int kernelSize)
+{
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0) || kernel == NULL) return;
+
+    int kernelWidth = (int)sqrtf((float)kernelSize);
+
+    if (kernelWidth*kernelWidth != kernelSize)
+    {
+        TRACELOG(LOG_WARNING, "IMAGE: Convolution kernel must be square to be applied");
+        return;
+    }
+
+    Color *pixels = LoadImageColors(*image);
+
+    Vector4 *imageCopy2 = RL_MALLOC((image->height)*(image->width)*sizeof(Vector4));
+    Vector4 *temp = RL_MALLOC(kernelSize*sizeof(Vector4));
+
+    for (int i = 0; i < kernelSize; i++)
+    {
+        temp[i].x = 0.0f;
+        temp[i].y = 0.0f;
+        temp[i].z = 0.0f;
+        temp[i].w = 0.0f;
+    }
+
+    float rRes = 0.0f;
+    float gRes = 0.0f;
+    float bRes = 0.0f;
+    float aRes = 0.0f;
+
+    int startRange = 0, endRange = 0;
+
+    if (kernelWidth%2 == 0)
+    {
+        startRange = -kernelWidth/2;
+        endRange = kernelWidth/2;
+    }
+    else
+    {
+        startRange = -kernelWidth/2;
+        endRange = kernelWidth/2 + 1;
+    }
+
+    for (int x = 0; x < image->height; x++)
+    {
+        for (int y = 0; y < image->width; y++)
+        {
+            for (int xk = startRange; xk < endRange; xk++)
+            {
+                for (int yk = startRange; yk < endRange; yk++)
+                {
+                    int xkabs = xk + kernelWidth/2;
+                    int ykabs = yk + kernelWidth/2;
+                    unsigned int imgindex = image->width*(x + xk) + (y + yk);
+
+                    if (imgindex >= (unsigned int)(image->width*image->height))
+                    {
+                        temp[kernelWidth*xkabs + ykabs].x = 0.0f;
+                        temp[kernelWidth*xkabs + ykabs].y = 0.0f;
+                        temp[kernelWidth*xkabs + ykabs].z = 0.0f;
+                        temp[kernelWidth*xkabs + ykabs].w = 0.0f;
+                    }
+                    else
+                    {
+                        temp[kernelWidth*xkabs + ykabs].x = ((float)pixels[imgindex].r)/255.0f*kernel[kernelWidth*xkabs + ykabs];
+                        temp[kernelWidth*xkabs + ykabs].y = ((float)pixels[imgindex].g)/255.0f*kernel[kernelWidth*xkabs + ykabs];
+                        temp[kernelWidth*xkabs + ykabs].z = ((float)pixels[imgindex].b)/255.0f*kernel[kernelWidth*xkabs + ykabs];
+                        temp[kernelWidth*xkabs + ykabs].w = ((float)pixels[imgindex].a)/255.0f*kernel[kernelWidth*xkabs + ykabs];
+                    }
+                }
+            }
+
+            for (int i = 0; i < kernelSize; i++)
+            {
+                rRes += temp[i].x;
+                gRes += temp[i].y;
+                bRes += temp[i].z;
+                aRes += temp[i].w;
+            }
+
+            if (rRes < 0.0f) rRes = 0.0f;
+            if (gRes < 0.0f) gRes = 0.0f;
+            if (bRes < 0.0f) bRes = 0.0f;
+
+            if (rRes > 1.0f) rRes = 1.0f;
+            if (gRes > 1.0f) gRes = 1.0f;
+            if (bRes > 1.0f) bRes = 1.0f;
+
+            imageCopy2[image->width*x + y].x = rRes;
+            imageCopy2[image->width*x + y].y = gRes;
+            imageCopy2[image->width*x + y].z = bRes;
+            imageCopy2[image->width*x + y].w = aRes;
+
+            rRes = 0.0f;
+            gRes = 0.0f;
+            bRes = 0.0f;
+            aRes = 0.0f;
+
+            for (int i = 0; i < kernelSize; i++)
+            {
+                temp[i].x = 0.0f;
+                temp[i].y = 0.0f;
+                temp[i].z = 0.0f;
+                temp[i].w = 0.0f;
+            }
+        }
+    }
+
+    for (int i = 0; i < (image->width*image->height); i++)
+    {
+        float alpha = (float)imageCopy2[i].w;
+
+        pixels[i].r = (unsigned char)((imageCopy2[i].x)*255.0f);
+        pixels[i].g = (unsigned char)((imageCopy2[i].y)*255.0f);
+        pixels[i].b = (unsigned char)((imageCopy2[i].z)*255.0f);
+        pixels[i].a = (unsigned char)((alpha)*255.0f);
+    }
+
+    int format = image->format;
+    RL_FREE(image->data);
+    RL_FREE(imageCopy2);
+    RL_FREE(temp);
+
+    image->data = pixels;
+    image->format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
     ImageFormat(image, format);
 }
 
@@ -1864,22 +2401,16 @@ void ImageMipmaps(Image *image)
         else TRACELOG(LOG_WARNING, "IMAGE: Mipmaps required memory could not be allocated");
 
         // Pointer to allocated memory point where store next mipmap level data
-        unsigned char *nextmip = (unsigned char *)image->data + GetPixelDataSize(image->width, image->height, image->format);
+        unsigned char *nextmip = image->data;
 
-        mipWidth = image->width/2;
-        mipHeight = image->height/2;
+        mipWidth = image->width;
+        mipHeight = image->height;
         mipSize = GetPixelDataSize(mipWidth, mipHeight, image->format);
         Image imCopy = ImageCopy(*image);
 
         for (int i = 1; i < mipCount; i++)
         {
-            TRACELOGD("IMAGE: Generating mipmap level: %i (%i x %i) - size: %i - offset: 0x%x", i, mipWidth, mipHeight, mipSize, nextmip);
-
-            ImageResize(&imCopy, mipWidth, mipHeight);  // Uses internally Mitchell cubic downscale filter
-
-            memcpy(nextmip, imCopy.data, mipSize);
             nextmip += mipSize;
-            image->mipmaps++;
 
             mipWidth /= 2;
             mipHeight /= 2;
@@ -1889,9 +2420,19 @@ void ImageMipmaps(Image *image)
             if (mipHeight < 1) mipHeight = 1;
 
             mipSize = GetPixelDataSize(mipWidth, mipHeight, image->format);
+
+            if (i < image->mipmaps) continue;
+
+            TRACELOGD("IMAGE: Generating mipmap level: %i (%i x %i) - size: %i - offset: 0x%x", i, mipWidth, mipHeight, mipSize, nextmip);
+
+            ImageResize(&imCopy, mipWidth, mipHeight); // Uses internally Mitchell cubic downscale filter
+
+            memcpy(nextmip, imCopy.data, mipSize);
         }
 
         UnloadImage(imCopy);
+
+        image->mipmaps = mipCount;
     }
     else TRACELOG(LOG_WARNING, "IMAGE: Mipmaps already available");
 }
@@ -2049,7 +2590,7 @@ void ImageFlipHorizontal(Image *image)
         {
             for (int x = 0; x < image->width; x++)
             {
-                // OPTION 1: Move pixels with memcopy()
+                // OPTION 1: Move pixels with memcpy()
                 //memcpy(flippedData + (y*image->width + x)*bytesPerPixel, ((unsigned char *)image->data) + (y*image->width + (image->width - 1 - x))*bytesPerPixel, bytesPerPixel);
 
                 // OPTION 2: Just copy data pixel by pixel
@@ -2074,6 +2615,65 @@ void ImageFlipHorizontal(Image *image)
             }
         }
         */
+    }
+}
+
+// Rotate image in degrees
+void ImageRotate(Image *image, int degrees)
+{
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
+    if (image->mipmaps > 1) TRACELOG(LOG_WARNING, "Image manipulation only applied to base mipmap level");
+    if (image->format >= PIXELFORMAT_COMPRESSED_DXT1_RGB) TRACELOG(LOG_WARNING, "Image manipulation not supported for compressed formats");
+    else
+    {
+        float rad = degrees*PI/180.0f;
+        float sinRadius = sinf(rad);
+        float cosRadius = cosf(rad);
+
+        int width = (int)(fabsf(image->width*cosRadius) + fabsf(image->height*sinRadius));
+        int height = (int)(fabsf(image->height*cosRadius) + fabsf(image->width*sinRadius));
+
+        int bytesPerPixel = GetPixelDataSize(1, 1, image->format);
+        unsigned char *rotatedData = (unsigned char *)RL_CALLOC(width*height, bytesPerPixel);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float oldX = ((x - width/2.0f)*cosRadius + (y - height/2.0f)*sinRadius) + image->width/2.0f;
+                float oldY = ((y - height/2.0f)*cosRadius - (x - width/2.0f)*sinRadius) + image->height/2.0f;
+
+                if ((oldX >= 0) && (oldX < image->width) && (oldY >= 0) && (oldY < image->height))
+                {
+                    int x1 = (int)floorf(oldX);
+                    int y1 = (int)floorf(oldY);
+                    int x2 = MIN(x1 + 1, image->width - 1);
+                    int y2 = MIN(y1 + 1, image->height - 1);
+
+                    float px = oldX - x1;
+                    float py = oldY - y1;
+
+                    for (int i = 0; i < bytesPerPixel; i++)
+                    {
+                        float f1 = ((unsigned char *)image->data)[(y1*image->width + x1)*bytesPerPixel + i];
+                        float f2 = ((unsigned char *)image->data)[(y1*image->width + x2)*bytesPerPixel + i];
+                        float f3 = ((unsigned char *)image->data)[(y2*image->width + x1)*bytesPerPixel + i];
+                        float f4 = ((unsigned char *)image->data)[(y2*image->width + x2)*bytesPerPixel + i];
+
+                        float val = f1*(1 - px)*(1 - py) + f2*px*(1 - py) + f3*(1 - px)*py + f4*px*py;
+
+                        rotatedData[(y*width + x)*bytesPerPixel + i] = (unsigned char)val;
+                    }
+                }
+            }
+        }
+
+        RL_FREE(image->data);
+        image->data = rotatedData;
+        image->width = width;
+        image->height = height;
     }
 }
 
@@ -2149,26 +2749,17 @@ void ImageColorTint(Image *image, Color color)
 
     Color *pixels = LoadImageColors(*image);
 
-    float cR = (float)color.r/255;
-    float cG = (float)color.g/255;
-    float cB = (float)color.b/255;
-    float cA = (float)color.a/255;
-
-    for (int y = 0; y < image->height; y++)
+    for (int i = 0; i < image->width*image->height; i++)
     {
-        for (int x = 0; x < image->width; x++)
-        {
-            int index = y*image->width + x;
-            unsigned char r = (unsigned char)(((float)pixels[index].r/255*cR)*255.0f);
-            unsigned char g = (unsigned char)(((float)pixels[index].g/255*cG)*255.0f);
-            unsigned char b = (unsigned char)(((float)pixels[index].b/255*cB)*255.0f);
-            unsigned char a = (unsigned char)(((float)pixels[index].a/255*cA)*255.0f);
+        unsigned char r = (unsigned char)(((int)pixels[i].r*(int)color.r)/255);
+        unsigned char g = (unsigned char)(((int)pixels[i].g*(int)color.g)/255);
+        unsigned char b = (unsigned char)(((int)pixels[i].b*(int)color.b)/255);
+        unsigned char a = (unsigned char)(((int)pixels[i].a*(int)color.a)/255);
 
-            pixels[index].r = r;
-            pixels[index].g = g;
-            pixels[index].b = b;
-            pixels[index].a = a;
-        }
+        pixels[i].r = r;
+        pixels[i].g = g;
+        pixels[i].b = b;
+        pixels[i].a = a;
     }
 
     int format = image->format;
@@ -2188,14 +2779,11 @@ void ImageColorInvert(Image *image)
 
     Color *pixels = LoadImageColors(*image);
 
-    for (int y = 0; y < image->height; y++)
+    for (int i = 0; i < image->width*image->height; i++)
     {
-        for (int x = 0; x < image->width; x++)
-        {
-            pixels[y*image->width + x].r = 255 - pixels[y*image->width + x].r;
-            pixels[y*image->width + x].g = 255 - pixels[y*image->width + x].g;
-            pixels[y*image->width + x].b = 255 - pixels[y*image->width + x].b;
-        }
+        pixels[i].r = 255 - pixels[i].r;
+        pixels[i].g = 255 - pixels[i].g;
+        pixels[i].b = 255 - pixels[i].b;
     }
 
     int format = image->format;
@@ -2228,38 +2816,35 @@ void ImageColorContrast(Image *image, float contrast)
 
     Color *pixels = LoadImageColors(*image);
 
-    for (int y = 0; y < image->height; y++)
+    for (int i = 0; i < image->width*image->height; i++)
     {
-        for (int x = 0; x < image->width; x++)
-        {
-            float pR = (float)pixels[y*image->width + x].r/255.0f;
-            pR -= 0.5f;
-            pR *= contrast;
-            pR += 0.5f;
-            pR *= 255;
-            if (pR < 0) pR = 0;
-            if (pR > 255) pR = 255;
+        float pR = (float)pixels[i].r/255.0f;
+        pR -= 0.5f;
+        pR *= contrast;
+        pR += 0.5f;
+        pR *= 255;
+        if (pR < 0) pR = 0;
+        if (pR > 255) pR = 255;
 
-            float pG = (float)pixels[y*image->width + x].g/255.0f;
-            pG -= 0.5f;
-            pG *= contrast;
-            pG += 0.5f;
-            pG *= 255;
-            if (pG < 0) pG = 0;
-            if (pG > 255) pG = 255;
+        float pG = (float)pixels[i].g/255.0f;
+        pG -= 0.5f;
+        pG *= contrast;
+        pG += 0.5f;
+        pG *= 255;
+        if (pG < 0) pG = 0;
+        if (pG > 255) pG = 255;
 
-            float pB = (float)pixels[y*image->width + x].b/255.0f;
-            pB -= 0.5f;
-            pB *= contrast;
-            pB += 0.5f;
-            pB *= 255;
-            if (pB < 0) pB = 0;
-            if (pB > 255) pB = 255;
+        float pB = (float)pixels[i].b/255.0f;
+        pB -= 0.5f;
+        pB *= contrast;
+        pB += 0.5f;
+        pB *= 255;
+        if (pB < 0) pB = 0;
+        if (pB > 255) pB = 255;
 
-            pixels[y*image->width + x].r = (unsigned char)pR;
-            pixels[y*image->width + x].g = (unsigned char)pG;
-            pixels[y*image->width + x].b = (unsigned char)pB;
-        }
+        pixels[i].r = (unsigned char)pR;
+        pixels[i].g = (unsigned char)pG;
+        pixels[i].b = (unsigned char)pB;
     }
 
     int format = image->format;
@@ -2283,27 +2868,24 @@ void ImageColorBrightness(Image *image, int brightness)
 
     Color *pixels = LoadImageColors(*image);
 
-    for (int y = 0; y < image->height; y++)
+    for (int i = 0; i < image->width*image->height; i++)
     {
-        for (int x = 0; x < image->width; x++)
-        {
-            int cR = pixels[y*image->width + x].r + brightness;
-            int cG = pixels[y*image->width + x].g + brightness;
-            int cB = pixels[y*image->width + x].b + brightness;
+        int cR = pixels[i].r + brightness;
+        int cG = pixels[i].g + brightness;
+        int cB = pixels[i].b + brightness;
 
-            if (cR < 0) cR = 1;
-            if (cR > 255) cR = 255;
+        if (cR < 0) cR = 1;
+        if (cR > 255) cR = 255;
 
-            if (cG < 0) cG = 1;
-            if (cG > 255) cG = 255;
+        if (cG < 0) cG = 1;
+        if (cG > 255) cG = 255;
 
-            if (cB < 0) cB = 1;
-            if (cB > 255) cB = 255;
+        if (cB < 0) cB = 1;
+        if (cB > 255) cB = 255;
 
-            pixels[y*image->width + x].r = (unsigned char)cR;
-            pixels[y*image->width + x].g = (unsigned char)cG;
-            pixels[y*image->width + x].b = (unsigned char)cB;
-        }
+        pixels[i].r = (unsigned char)cR;
+        pixels[i].g = (unsigned char)cG;
+        pixels[i].b = (unsigned char)cB;
     }
 
     int format = image->format;
@@ -2323,20 +2905,17 @@ void ImageColorReplace(Image *image, Color color, Color replace)
 
     Color *pixels = LoadImageColors(*image);
 
-    for (int y = 0; y < image->height; y++)
+    for (int i = 0; i < image->width*image->height; i++)
     {
-        for (int x = 0; x < image->width; x++)
+        if ((pixels[i].r == color.r) &&
+            (pixels[i].g == color.g) &&
+            (pixels[i].b == color.b) &&
+            (pixels[i].a == color.a))
         {
-            if ((pixels[y*image->width + x].r == color.r) &&
-                (pixels[y*image->width + x].g == color.g) &&
-                (pixels[y*image->width + x].b == color.b) &&
-                (pixels[y*image->width + x].a == color.a))
-            {
-                pixels[y*image->width + x].r = replace.r;
-                pixels[y*image->width + x].g = replace.g;
-                pixels[y*image->width + x].b = replace.b;
-                pixels[y*image->width + x].a = replace.a;
-            }
+            pixels[i].r = replace.r;
+            pixels[i].g = replace.g;
+            pixels[i].b = replace.b;
+            pixels[i].a = replace.a;
         }
     }
 
@@ -2364,6 +2943,10 @@ Color *LoadImageColors(Image image)
         if ((image.format == PIXELFORMAT_UNCOMPRESSED_R32) ||
             (image.format == PIXELFORMAT_UNCOMPRESSED_R32G32B32) ||
             (image.format == PIXELFORMAT_UNCOMPRESSED_R32G32B32A32)) TRACELOG(LOG_WARNING, "IMAGE: Pixel format converted from 32bit to 8bit per channel");
+
+        if ((image.format == PIXELFORMAT_UNCOMPRESSED_R16) ||
+            (image.format == PIXELFORMAT_UNCOMPRESSED_R16G16B16) ||
+            (image.format == PIXELFORMAT_UNCOMPRESSED_R16G16B16A16)) TRACELOG(LOG_WARNING, "IMAGE: Pixel format converted from 16bit to 8bit per channel");
 
         for (int i = 0, k = 0; i < image.width*image.height; i++)
         {
@@ -2441,6 +3024,7 @@ Color *LoadImageColors(Image image)
                     pixels[i].b = 0;
                     pixels[i].a = 255;
 
+                    k += 1;
                 } break;
                 case PIXELFORMAT_UNCOMPRESSED_R32G32B32:
                 {
@@ -2454,9 +3038,36 @@ Color *LoadImageColors(Image image)
                 case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
                 {
                     pixels[i].r = (unsigned char)(((float *)image.data)[k]*255.0f);
-                    pixels[i].g = (unsigned char)(((float *)image.data)[k]*255.0f);
-                    pixels[i].b = (unsigned char)(((float *)image.data)[k]*255.0f);
-                    pixels[i].a = (unsigned char)(((float *)image.data)[k]*255.0f);
+                    pixels[i].g = (unsigned char)(((float *)image.data)[k + 1]*255.0f);
+                    pixels[i].b = (unsigned char)(((float *)image.data)[k + 2]*255.0f);
+                    pixels[i].a = (unsigned char)(((float *)image.data)[k + 3]*255.0f);
+
+                    k += 4;
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16:
+                {
+                    pixels[i].r = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k])*255.0f);
+                    pixels[i].g = 0;
+                    pixels[i].b = 0;
+                    pixels[i].a = 255;
+
+                    k += 1;
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16:
+                {
+                    pixels[i].r = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k])*255.0f);
+                    pixels[i].g = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k + 1])*255.0f);
+                    pixels[i].b = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k + 2])*255.0f);
+                    pixels[i].a = 255;
+
+                    k += 3;
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                {
+                    pixels[i].r = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k])*255.0f);
+                    pixels[i].g = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k + 1])*255.0f);
+                    pixels[i].b = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k + 2])*255.0f);
+                    pixels[i].a = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[k + 3])*255.0f);
 
                     k += 4;
                 } break;
@@ -2672,6 +3283,30 @@ Color GetImageColor(Image image, int x, int y)
                 color.a = (unsigned char)(((float *)image.data)[(y*image.width + x)*4]*255.0f);
 
             } break;
+            case PIXELFORMAT_UNCOMPRESSED_R16:
+            {
+                color.r = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[y*image.width + x])*255.0f);
+                color.g = 0;
+                color.b = 0;
+                color.a = 255;
+
+            } break;
+            case PIXELFORMAT_UNCOMPRESSED_R16G16B16:
+            {
+                color.r = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[(y*image.width + x)*3])*255.0f);
+                color.g = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[(y*image.width + x)*3 + 1])*255.0f);
+                color.b = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[(y*image.width + x)*3 + 2])*255.0f);
+                color.a = 255;
+
+            } break;
+            case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+            {
+                color.r = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[(y*image.width + x)*4])*255.0f);
+                color.g = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[(y*image.width + x)*4])*255.0f);
+                color.b = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[(y*image.width + x)*4])*255.0f);
+                color.a = (unsigned char)(HalfToFloat(((unsigned short *)image.data)[(y*image.width + x)*4])*255.0f);
+
+            } break;
             default: TRACELOG(LOG_WARNING, "Compressed image format does not support color reading"); break;
         }
     }
@@ -2696,9 +3331,9 @@ void ImageClearBackground(Image *dst, Color color)
     int bytesPerPixel = GetPixelDataSize(1, 1, dst->format);
 
     // Repeat the first pixel data throughout the image
-    for (int i = 1; i < dst->width * dst->height; i++)
+    for (int i = 1; i < dst->width*dst->height; i++)
     {
-        memcpy(pSrcPixel + i * bytesPerPixel, pSrcPixel, bytesPerPixel);
+        memcpy(pSrcPixel + i*bytesPerPixel, pSrcPixel, bytesPerPixel);
     }
 }
 
@@ -2811,6 +3446,34 @@ void ImageDrawPixel(Image *dst, int x, int y, Color color)
             ((float *)dst->data)[(y*dst->width + x)*4 + 3] = coln.w;
 
         } break;
+        case PIXELFORMAT_UNCOMPRESSED_R16:
+        {
+            // NOTE: Calculate grayscale equivalent color (normalized to 32bit)
+            Vector3 coln = { (float)color.r/255.0f, (float)color.g/255.0f, (float)color.b/255.0f };
+
+            ((unsigned short*)dst->data)[y*dst->width + x] = FloatToHalf(coln.x*0.299f + coln.y*0.587f + coln.z*0.114f);
+
+        } break;
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16:
+        {
+            // NOTE: Calculate R32G32B32 equivalent color (normalized to 32bit)
+            Vector3 coln = { (float)color.r/255.0f, (float)color.g/255.0f, (float)color.b/255.0f };
+
+            ((unsigned short *)dst->data)[(y*dst->width + x)*3] = FloatToHalf(coln.x);
+            ((unsigned short *)dst->data)[(y*dst->width + x)*3 + 1] = FloatToHalf(coln.y);
+            ((unsigned short *)dst->data)[(y*dst->width + x)*3 + 2] = FloatToHalf(coln.z);
+        } break;
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+        {
+            // NOTE: Calculate R32G32B32A32 equivalent color (normalized to 32bit)
+            Vector4 coln = { (float)color.r/255.0f, (float)color.g/255.0f, (float)color.b/255.0f, (float)color.a/255.0f };
+
+            ((unsigned short *)dst->data)[(y*dst->width + x)*4] = FloatToHalf(coln.x);
+            ((unsigned short *)dst->data)[(y*dst->width + x)*4 + 1] = FloatToHalf(coln.y);
+            ((unsigned short *)dst->data)[(y*dst->width + x)*4 + 2] = FloatToHalf(coln.z);
+            ((unsigned short *)dst->data)[(y*dst->width + x)*4 + 3] = FloatToHalf(coln.w);
+
+        } break;
         default: break;
     }
 }
@@ -2824,98 +3487,112 @@ void ImageDrawPixelV(Image *dst, Vector2 position, Color color)
 // Draw line within an image
 void ImageDrawLine(Image *dst, int startPosX, int startPosY, int endPosX, int endPosY, Color color)
 {
-    // Using Bresenham's algorithm as described in
-    // Drawing Lines with Pixels - Joshua Scott - March 2012
-    // https://classic.csunplugged.org/wp-content/uploads/2014/12/Lines.pdf
+    // Calculate differences in coordinates
+    int shortLen = endPosY - startPosY;
+    int longLen = endPosX - startPosX;
+    bool yLonger = false;
 
-    int changeInX = (endPosX - startPosX);
-    int absChangeInX = (changeInX < 0)? -changeInX : changeInX;
-    int changeInY = (endPosY - startPosY);
-    int absChangeInY = (changeInY < 0)? -changeInY : changeInY;
-
-    int startU, startV, endU, stepV; // Substitutions, either U = X, V = Y or vice versa. See loop at end of function
-    //int endV;     // Not needed but left for better understanding, check code below
-    int A, B, P;    // See linked paper above, explained down in the main loop
-    int reversedXY = (absChangeInY < absChangeInX);
-
-    if (reversedXY)
+    // Determine if the line is more vertical than horizontal
+    if (abs(shortLen) > abs(longLen))
     {
-        A = 2*absChangeInY;
-        B = A - 2*absChangeInX;
-        P = A - absChangeInX;
+        // Swap the lengths if the line is more vertical
+        int temp = shortLen;
+        shortLen = longLen;
+        longLen = temp;
+        yLonger = true;
+    }
 
-        if (changeInX > 0)
+    // Initialize variables for drawing loop
+    int endVal = longLen;
+    int sgnInc = 1;
+
+    // Adjust direction increment based on longLen sign
+    if (longLen < 0)
+    {
+        longLen = -longLen;
+        sgnInc = -1;
+    }
+
+    // Calculate fixed-point increment for shorter length
+    int decInc = (longLen == 0)? 0 : (shortLen << 16)/longLen;
+
+    // Draw the line pixel by pixel
+    if (yLonger)
+    {
+        // If line is more vertical, iterate over y-axis
+        for (int i = 0, j = 0; i != endVal; i += sgnInc, j += decInc)
         {
-            startU = startPosX;
-            startV = startPosY;
-            endU = endPosX;
-            //endV = endPosY;
+            // Calculate pixel position and draw it
+            ImageDrawPixel(dst, startPosX + (j >> 16), startPosY + i, color);
         }
-        else
-        {
-            startU = endPosX;
-            startV = endPosY;
-            endU = startPosX;
-            //endV = startPosY;
-
-            // Since start and end are reversed
-            changeInX = -changeInX;
-            changeInY = -changeInY;
-        }
-
-        stepV = (changeInY < 0)? -1 : 1;
-
-        ImageDrawPixel(dst, startU, startV, color);     // At this point they are correctly ordered...
     }
     else
     {
-        A = 2*absChangeInX;
-        B = A - 2*absChangeInY;
-        P = A - absChangeInY;
-
-        if (changeInY > 0)
+        // If line is more horizontal, iterate over x-axis
+        for (int i = 0, j = 0; i != endVal; i += sgnInc, j += decInc)
         {
-            startU = startPosY;
-            startV = startPosX;
-            endU = endPosY;
-            //endV = endPosX;
+            // Calculate pixel position and draw it
+            ImageDrawPixel(dst, startPosX + i, startPosY + (j >> 16), color);
         }
-        else
-        {
-            startU = endPosY;
-            startV = endPosX;
-            endU = startPosY;
-            //endV = startPosX;
-
-            // Since start and end are reversed
-            changeInX = -changeInX;
-            changeInY = -changeInY;
-        }
-
-        stepV = (changeInX < 0)? -1 : 1;
-
-        ImageDrawPixel(dst, startV, startU, color);     // ... but need to be reversed here. Repeated in the main loop below
-    }
-
-    // We already drew the start point. If we started at startU + 0, the line would be crooked and too short
-    for (int u = startU + 1, v = startV; u <= endU; u++)
-    {
-        if (P >= 0)
-        {
-            v += stepV;     // Adjusts whenever we stray too far from the direct line. Details in the linked paper above
-            P += B;         // Remembers that we corrected our path
-        }
-        else P += A;        // Remembers how far we are from the direct line
-
-        if (reversedXY) ImageDrawPixel(dst, u, v, color);
-        else ImageDrawPixel(dst, v, u, color);
     }
 }
 
 // Draw line within an image (Vector version)
 void ImageDrawLineV(Image *dst, Vector2 start, Vector2 end, Color color)
 {
-    ImageDrawLine(dst, (int)start.x, (int)start.y, (int)end.x, (int)end.y, color);
+    // Round start and end positions to nearest integer coordinates
+    int x1 = (int)(start.x + 0.5f);
+    int y1 = (int)(start.y + 0.5f);
+    int x2 = (int)(end.x + 0.5f);
+    int y2 = (int)(end.y + 0.5f);
+
+    // Draw a vertical line using ImageDrawLine function
+    ImageDrawLine(dst, x1, y1, x2, y2, color);
+}
+
+// Draw a line defining thickness within an image
+void ImageDrawLineEx(Image *dst, Vector2 start, Vector2 end, int thick, Color color)
+{
+    // Round start and end positions to nearest integer coordinates
+    int x1 = (int)(start.x + 0.5f);
+    int y1 = (int)(start.y + 0.5f);
+    int x2 = (int)(end.x + 0.5f);
+    int y2 = (int)(end.y + 0.5f);
+
+    // Calculate differences in x and y coordinates
+    int dx = x2 - x1;
+    int dy = y2 - y1;
+
+    // Draw the main line between (x1, y1) and (x2, y2)
+    ImageDrawLine(dst, x1, y1, x2, y2, color);
+
+    // Determine if the line is more horizontal or vertical
+    if (dx != 0 && abs(dy/dx) < 1)
+    {
+        // Line is more horizontal
+        // Calculate half the width of the line
+        int wy = (thick - 1)*(int)sqrtf((float)(dx*dx + dy*dy))/(2*abs(dx));
+
+        // Draw additional lines above and below the main line
+        for (int i = 1; i <= wy; i++)
+        {
+            ImageDrawLine(dst, x1, y1 - i, x2, y2 - i, color); // Draw above the main line
+            ImageDrawLine(dst, x1, y1 + i, x2, y2 + i, color); // Draw below the main line
+        }
+    }
+    else if (dy != 0)
+    {
+        // Line is more vertical or perfectly horizontal
+        // Calculate half the width of the line
+        int wx = (thick - 1)*(int)sqrtf((float)(dx*dx + dy*dy))/(2*abs(dy));
+
+        // Draw additional lines to the left and right of the main line
+        for (int i = 1; i <= wx; i++)
+        {
+            ImageDrawLine(dst, x1 - i, y1, x2 - i, y2, color); // Draw left of the main line
+            ImageDrawLine(dst, x1 + i, y1, x2 + i, y2, color); // Draw right of the main line
+        }
+    }
 }
 
 // Draw circle within an image
@@ -3000,26 +3677,42 @@ void ImageDrawRectangleRec(Image *dst, Rectangle rec, Color color)
     // Security check to avoid program crash
     if ((dst->data == NULL) || (dst->width == 0) || (dst->height == 0)) return;
 
-    int sy = (int)rec.y;
-    int ey = sy + (int)rec.height;
+    // Security check to avoid drawing out of bounds in case of bad user data
+    if (rec.x < 0) { rec.width += rec.x; rec.x = 0; }
+    if (rec.y < 0) { rec.height += rec.y; rec.y = 0; }
+    if (rec.width < 0) rec.width = 0;
+    if (rec.height < 0) rec.height = 0;
 
+    // Clamp the size the the image bounds
+    if ((rec.x + rec.width) >= dst->width) rec.width = dst->width - rec.x;
+    if ((rec.y + rec.height) >= dst->height) rec.height = dst->height - rec.y;
+
+    // Check if the rect is even inside the image
+    if ((rec.x >= dst->width) || (rec.y >= dst->height)) return;
+    if (((rec.x + rec.width) <= 0) || (rec.y + rec.height <= 0)) return;
+
+    int sy = (int)rec.y;
     int sx = (int)rec.x;
 
     int bytesPerPixel = GetPixelDataSize(1, 1, dst->format);
 
-    for (int y = sy; y < ey; y++)
+    // Fill in the first pixel of the first row based on image format
+    ImageDrawPixel(dst, sx, sy, color);
+
+    int bytesOffset = ((sy*dst->width) + sx)*bytesPerPixel;
+    unsigned char *pSrcPixel = (unsigned char *)dst->data + bytesOffset;
+
+    // Repeat the first pixel data throughout the row
+    for (int x = 1; x < (int)rec.width; x++)
     {
-        // Fill in the first pixel of the row based on image format
-        ImageDrawPixel(dst, sx, y, color);
+        memcpy(pSrcPixel + x*bytesPerPixel, pSrcPixel, bytesPerPixel);
+    }
 
-        int bytesOffset = ((y * dst->width) + sx) * bytesPerPixel;
-        unsigned char *pSrcPixel = (unsigned char *)dst->data + bytesOffset;
-
-        // Repeat the first pixel data throughout the row
-        for (int x = 1; x < (int)rec.width; x++)
-        {
-            memcpy(pSrcPixel + x * bytesPerPixel, pSrcPixel, bytesPerPixel);
-        }
+    // Repeat the first row data for all other rows
+    int bytesPerRow = bytesPerPixel*(int)rec.width;
+    for (int y = 1; y < (int)rec.height; y++)
+    {
+        memcpy(pSrcPixel + (y*dst->width)*bytesPerPixel, pSrcPixel, bytesPerRow);
     }
 }
 
@@ -3032,6 +3725,194 @@ void ImageDrawRectangleLines(Image *dst, Rectangle rec, int thick, Color color)
     ImageDrawRectangle(dst, (int)rec.x, (int)(rec.y + rec.height - thick), (int)rec.width, thick, color);
 }
 
+// Draw triangle within an image
+void ImageDrawTriangle(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color)
+{
+    // Calculate the 2D bounding box of the triangle
+    // Determine the minimum and maximum x and y coordinates of the triangle vertices
+    int xMin = (int)((v1.x < v2.x)? ((v1.x < v3.x)? v1.x : v3.x) : ((v2.x < v3.x)? v2.x : v3.x));
+    int yMin = (int)((v1.y < v2.y)? ((v1.y < v3.y)? v1.y : v3.y) : ((v2.y < v3.y)? v2.y : v3.y));
+    int xMax = (int)((v1.x > v2.x)? ((v1.x > v3.x)? v1.x : v3.x) : ((v2.x > v3.x)? v2.x : v3.x));
+    int yMax = (int)((v1.y > v2.y)? ((v1.y > v3.y)? v1.y : v3.y) : ((v2.y > v3.y)? v2.y : v3.y));
+
+    // Clamp the bounding box to the image dimensions
+    if (xMin < 0) xMin = 0;
+    if (yMin < 0) yMin = 0;
+    if (xMax > dst->width) xMax = dst->width;
+    if (yMax > dst->height) yMax = dst->height;
+
+    // Check the order of the vertices to determine if it's a front or back face
+    // NOTE: if signedArea is equal to 0, the face is degenerate
+    float signedArea = (v2.x - v1.x)*(v3.y - v1.y) - (v3.x - v1.x)*(v2.y - v1.y);
+    bool isBackFace = (signedArea > 0);
+
+    // Barycentric interpolation setup
+    // Calculate the step increments for the barycentric coordinates
+    int w1XStep = (int)(v3.y - v2.y), w1YStep = (int)(v2.x - v3.x);
+    int w2XStep = (int)(v1.y - v3.y), w2YStep = (int)(v3.x - v1.x);
+    int w3XStep = (int)(v2.y - v1.y), w3YStep = (int)(v1.x - v2.x);
+
+    // If the triangle is a back face, invert the steps
+    if (isBackFace)
+    {
+        w1XStep = -w1XStep, w1YStep = -w1YStep;
+        w2XStep = -w2XStep, w2YStep = -w2YStep;
+        w3XStep = -w3XStep, w3YStep = -w3YStep;
+    }
+
+    // Calculate the initial barycentric coordinates for the top-left point of the bounding box
+    int w1Row = (int)((xMin - v2.x)*w1XStep + w1YStep*(yMin - v2.y));
+    int w2Row = (int)((xMin - v3.x)*w2XStep + w2YStep*(yMin - v3.y));
+    int w3Row = (int)((xMin - v1.x)*w3XStep + w3YStep*(yMin - v1.y));
+
+    // Rasterization loop
+    // Iterate through each pixel in the bounding box
+    for (int y = yMin; y <= yMax; y++)
+    {
+        int w1 = w1Row;
+        int w2 = w2Row;
+        int w3 = w3Row;
+
+        for (int x = xMin; x <= xMax; x++)
+        {
+            // Check if the pixel is inside the triangle using barycentric coordinates
+            // If it is then we can draw the pixel with the given color
+            if ((w1 | w2 | w3) >= 0) ImageDrawPixel(dst, x, y, color);
+
+            // Increment the barycentric coordinates for the next pixel
+            w1 += w1XStep;
+            w2 += w2XStep;
+            w3 += w3XStep;
+        }
+
+        // Move to the next row in the bounding box
+        w1Row += w1YStep;
+        w2Row += w2YStep;
+        w3Row += w3YStep;
+    }
+}
+
+// Draw triangle with interpolated colors within an image
+void ImageDrawTriangleEx(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color c1, Color c2, Color c3)
+{
+    // Calculate the 2D bounding box of the triangle
+    // Determine the minimum and maximum x and y coordinates of the triangle vertices
+    int xMin = (int)((v1.x < v2.x)? ((v1.x < v3.x)? v1.x : v3.x) : ((v2.x < v3.x)? v2.x : v3.x));
+    int yMin = (int)((v1.y < v2.y)? ((v1.y < v3.y)? v1.y : v3.y) : ((v2.y < v3.y)? v2.y : v3.y));
+    int xMax = (int)((v1.x > v2.x)? ((v1.x > v3.x)? v1.x : v3.x) : ((v2.x > v3.x)? v2.x : v3.x));
+    int yMax = (int)((v1.y > v2.y)? ((v1.y > v3.y)? v1.y : v3.y) : ((v2.y > v3.y)? v2.y : v3.y));
+
+    // Clamp the bounding box to the image dimensions
+    if (xMin < 0) xMin = 0;
+    if (yMin < 0) yMin = 0;
+    if (xMax > dst->width) xMax = dst->width;
+    if (yMax > dst->height) yMax = dst->height;
+
+    // Check the order of the vertices to determine if it's a front or back face
+    // NOTE: if signedArea is equal to 0, the face is degenerate
+    float signedArea = (v2.x - v1.x)*(v3.y - v1.y) - (v3.x - v1.x)*(v2.y - v1.y);
+    bool isBackFace = (signedArea > 0);
+
+    // Barycentric interpolation setup
+    // Calculate the step increments for the barycentric coordinates
+    int w1XStep = (int)(v3.y - v2.y), w1YStep = (int)(v2.x - v3.x);
+    int w2XStep = (int)(v1.y - v3.y), w2YStep = (int)(v3.x - v1.x);
+    int w3XStep = (int)(v2.y - v1.y), w3YStep = (int)(v1.x - v2.x);
+
+    // If the triangle is a back face, invert the steps
+    if (isBackFace)
+    {
+        w1XStep = -w1XStep, w1YStep = -w1YStep;
+        w2XStep = -w2XStep, w2YStep = -w2YStep;
+        w3XStep = -w3XStep, w3YStep = -w3YStep;
+    }
+
+    // Calculate the initial barycentric coordinates for the top-left point of the bounding box
+    int w1Row = (int)((xMin - v2.x)*w1XStep + w1YStep*(yMin - v2.y));
+    int w2Row = (int)((xMin - v3.x)*w2XStep + w2YStep*(yMin - v3.y));
+    int w3Row = (int)((xMin - v1.x)*w3XStep + w3YStep*(yMin - v1.y));
+
+    // Calculate the inverse of the sum of the barycentric coordinates for normalization
+    // NOTE 1: Here, we act as if we multiply by 255 the reciprocal, which avoids additional
+    //         calculations in the loop. This is acceptable because we are only interpolating colors.
+    // NOTE 2: This sum remains constant throughout the triangle
+    float wInvSum = 255.0f/(w1Row + w2Row + w3Row);
+
+    // Rasterization loop
+    // Iterate through each pixel in the bounding box
+    for (int y = yMin; y <= yMax; y++)
+    {
+        int w1 = w1Row;
+        int w2 = w2Row;
+        int w3 = w3Row;
+
+        for (int x = xMin; x <= xMax; x++)
+        {
+            // Check if the pixel is inside the triangle using barycentric coordinates
+            if ((w1 | w2 | w3) >= 0)
+            {
+                // Compute the normalized barycentric coordinates
+                unsigned char aW1 = (unsigned char)((float)w1*wInvSum);
+                unsigned char aW2 = (unsigned char)((float)w2*wInvSum);
+                unsigned char aW3 = (unsigned char)((float)w3*wInvSum);
+
+                // Interpolate the color using the barycentric coordinates
+                Color finalColor = { 0 };
+                finalColor.r = (c1.r*aW1 + c2.r*aW2 + c3.r*aW3)/255;
+                finalColor.g = (c1.g*aW1 + c2.g*aW2 + c3.g*aW3)/255;
+                finalColor.b = (c1.b*aW1 + c2.b*aW2 + c3.b*aW3)/255;
+                finalColor.a = (c1.a*aW1 + c2.a*aW2 + c3.a*aW3)/255;
+
+                // Draw the pixel with the interpolated color
+                ImageDrawPixel(dst, x, y, finalColor);
+            }
+
+            // Increment the barycentric coordinates for the next pixel
+            w1 += w1XStep;
+            w2 += w2XStep;
+            w3 += w3XStep;
+        }
+
+        // Move to the next row in the bounding box
+        w1Row += w1YStep;
+        w2Row += w2YStep;
+        w3Row += w3YStep;
+    }
+}
+
+// Draw triangle outline within an image
+void ImageDrawTriangleLines(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color)
+{
+    ImageDrawLine(dst, (int)v1.x, (int)v1.y, (int)v2.x, (int)v2.y, color);
+    ImageDrawLine(dst, (int)v2.x, (int)v2.y, (int)v3.x, (int)v3.y, color);
+    ImageDrawLine(dst, (int)v3.x, (int)v3.y, (int)v1.x, (int)v1.y, color);
+}
+
+// Draw a triangle fan defined by points within an image (first vertex is the center)
+void ImageDrawTriangleFan(Image *dst, Vector2 *points, int pointCount, Color color)
+{
+    if (pointCount >= 3)
+    {
+        for (int i = 1; i < pointCount - 1; i++)
+        {
+            ImageDrawTriangle(dst, points[0], points[i], points[i + 1], color);
+        }
+    }
+}
+
+// Draw a triangle strip defined by points within an image
+void ImageDrawTriangleStrip(Image *dst, Vector2 *points, int pointCount, Color color)
+{
+    if (pointCount >= 3)
+    {
+        for (int i = 2; i < pointCount; i++)
+        {
+            if ((i%2) == 0) ImageDrawTriangle(dst, points[i], points[i - 2], points[i - 1], color);
+            else ImageDrawTriangle(dst, points[i], points[i - 1], points[i - 2], color);
+        }
+    }
+}
+
 // Draw an image (source) within an image (destination)
 // NOTE: Color tint is applied to source image
 void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color tint)
@@ -3040,7 +3921,6 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color 
     if ((dst->data == NULL) || (dst->width == 0) || (dst->height == 0) ||
         (src.data == NULL) || (src.width == 0) || (src.height == 0)) return;
 
-    if (dst->mipmaps > 1) TRACELOG(LOG_WARNING, "Image drawing only applied to base mipmap level");
     if (dst->format >= PIXELFORMAT_COMPRESSED_DXT1_RGB) TRACELOG(LOG_WARNING, "Image drawing not supported for compressed formats");
     else
     {
@@ -3069,7 +3949,7 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color 
         // Destination rectangle out-of-bounds security checks
         if (dstRec.x < 0)
         {
-            srcRec.x = -dstRec.x;
+            srcRec.x -= dstRec.x;
             srcRec.width += dstRec.x;
             dstRec.x = 0;
         }
@@ -3077,7 +3957,7 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color 
 
         if (dstRec.y < 0)
         {
-            srcRec.y = -dstRec.y;
+            srcRec.y -= dstRec.y;
             srcRec.height += dstRec.y;
             dstRec.y = 0;
         }
@@ -3098,13 +3978,21 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color 
         //    [-] GetPixelColor(): Get Vector4 instead of Color, easier for ColorAlphaBlend()
         //    [ ] Support f32bit channels drawing
 
-        // TODO: Support PIXELFORMAT_UNCOMPRESSED_R32, PIXELFORMAT_UNCOMPRESSED_R32G32B32, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32
+        // TODO: Support PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 and PIXELFORMAT_UNCOMPRESSED_R1616B16A16
 
         Color colSrc, colDst, blend;
         bool blendRequired = true;
 
         // Fast path: Avoid blend if source has no alpha to blend
-        if ((tint.a == 255) && ((srcPtr->format == PIXELFORMAT_UNCOMPRESSED_GRAYSCALE) || (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R8G8B8) || (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R5G6B5))) blendRequired = false;
+        if ((tint.a == 255) &&
+            ((srcPtr->format == PIXELFORMAT_UNCOMPRESSED_GRAYSCALE) ||
+            (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R5G6B5) ||
+            (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R8G8B8) ||
+            (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R32) ||
+            (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R32G32B32) ||
+            (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R16) ||
+            (srcPtr->format == PIXELFORMAT_UNCOMPRESSED_R16G16B16)))
+            blendRequired = false;
 
         int strideDst = GetPixelDataSize(dst->width, 1, dst->format);
         int bytesPerPixelDst = strideDst/(dst->width);
@@ -3145,16 +4033,47 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color 
         }
 
         if (useSrcMod) UnloadImage(srcMod);     // Unload source modified image
+
+        if ((dst->mipmaps > 1) && (src.mipmaps > 1))
+        {
+            Image mipmapDst = *dst;
+            mipmapDst.data = (char *)mipmapDst.data + GetPixelDataSize(mipmapDst.width, mipmapDst.height, mipmapDst.format);
+            mipmapDst.width /= 2;
+            mipmapDst.height /= 2;
+            mipmapDst.mipmaps--;
+
+            Image mipmapSrc = src;
+            mipmapSrc.data = (char *)mipmapSrc.data + GetPixelDataSize(mipmapSrc.width, mipmapSrc.height, mipmapSrc.format);
+            mipmapSrc.width /= 2;
+            mipmapSrc.height /= 2;
+            mipmapSrc.mipmaps--;
+
+            Rectangle mipmapSrcRec = srcRec;
+            mipmapSrcRec.width /= 2;
+            mipmapSrcRec.height /= 2;
+            mipmapSrcRec.x /= 2;
+            mipmapSrcRec.y /= 2;
+
+            Rectangle mipmapDstRec = dstRec;
+            mipmapDstRec.width /= 2;
+            mipmapDstRec.height /= 2;
+            mipmapDstRec.x /= 2;
+            mipmapDstRec.y /= 2;
+
+            ImageDraw(&mipmapDst, mipmapSrc, mipmapSrcRec, mipmapDstRec, tint);
+        }
     }
 }
 
 // Draw text (default font) within an image (destination)
 void ImageDrawText(Image *dst, const char *text, int posX, int posY, int fontSize, Color color)
 {
-#if defined(SUPPORT_MODULE_RTEXT)
+#if defined(SUPPORT_MODULE_RTEXT) && defined(SUPPORT_DEFAULT_FONT)
+    // Make sure default font is loaded to be used on image text drawing
+    if (GetFontDefault().texture.id == 0) LoadFontDefault();
+
     Vector2 position = { (float)posX, (float)posY };
-    // NOTE: For default font, spacing is set to desired font size / default font size (10)
-    ImageDrawTextEx(dst, GetFontDefault(), text, position, (float)fontSize, (float)fontSize/10, color);   // WARNING: Module required: rtext
+    ImageDrawTextEx(dst, GetFontDefault(), text, position, (float)fontSize, 1.0f, color);   // WARNING: Module required: rtext
 #else
     TRACELOG(LOG_WARNING, "IMAGE: ImageDrawText() requires module: rtext");
 #endif
@@ -3224,16 +4143,22 @@ TextureCubemap LoadTextureCubemap(Image image, int layout)
         {
             if ((image.width/6) == image.height) { layout = CUBEMAP_LAYOUT_LINE_HORIZONTAL; cubemap.width = image.width/6; }
             else if ((image.width/4) == (image.height/3)) { layout = CUBEMAP_LAYOUT_CROSS_FOUR_BY_THREE; cubemap.width = image.width/4; }
-            else if (image.width >= (int)((float)image.height*1.85f)) { layout = CUBEMAP_LAYOUT_PANORAMA; cubemap.width = image.width/4; }
         }
         else if (image.height > image.width)
         {
             if ((image.height/6) == image.width) { layout = CUBEMAP_LAYOUT_LINE_VERTICAL; cubemap.width = image.height/6; }
             else if ((image.width/3) == (image.height/4)) { layout = CUBEMAP_LAYOUT_CROSS_THREE_BY_FOUR; cubemap.width = image.width/3; }
         }
-
-        cubemap.height = cubemap.width;
     }
+    else
+    {
+        if (layout == CUBEMAP_LAYOUT_LINE_VERTICAL) cubemap.width = image.height/6;
+        if (layout == CUBEMAP_LAYOUT_LINE_HORIZONTAL) cubemap.width = image.width/6;
+        if (layout == CUBEMAP_LAYOUT_CROSS_THREE_BY_FOUR) cubemap.width = image.width/3;
+        if (layout == CUBEMAP_LAYOUT_CROSS_FOUR_BY_THREE) cubemap.width = image.width/4;
+    }
+
+    cubemap.height = cubemap.width;
 
     // Layout provided or already auto-detected
     if (layout != CUBEMAP_LAYOUT_AUTO_DETECT)
@@ -3242,17 +4167,18 @@ TextureCubemap LoadTextureCubemap(Image image, int layout)
 
         Image faces = { 0 };                // Vertical column image
         Rectangle faceRecs[6] = { 0 };      // Face source rectangles
+
         for (int i = 0; i < 6; i++) faceRecs[i] = (Rectangle){ 0, 0, (float)size, (float)size };
 
         if (layout == CUBEMAP_LAYOUT_LINE_VERTICAL)
         {
             faces = ImageCopy(image);       // Image data already follows expected convention
         }
-        else if (layout == CUBEMAP_LAYOUT_PANORAMA)
+        /*else if (layout == CUBEMAP_LAYOUT_PANORAMA)
         {
-            // TODO: Convert panorama image to square faces...
+            // TODO: implement panorama by converting image to square faces...
             // Ref: https://github.com/denivip/panorama/blob/master/panorama.cpp
-        }
+        } */
         else
         {
             if (layout == CUBEMAP_LAYOUT_LINE_HORIZONTAL) for (int i = 0; i < 6; i++) faceRecs[i].x = (float)size*i;
@@ -3279,15 +4205,27 @@ TextureCubemap LoadTextureCubemap(Image image, int layout)
             faces = GenImageColor(size, size*6, MAGENTA);
             ImageFormat(&faces, image.format);
 
+            Image mipmapped = ImageCopy(image);
+            ImageMipmaps(&mipmapped);
+            ImageMipmaps(&faces);
+
             // NOTE: Image formatting does not work with compressed textures
 
-            for (int i = 0; i < 6; i++) ImageDraw(&faces, image, faceRecs[i], (Rectangle){ 0, (float)size*i, (float)size, (float)size }, WHITE);
+            for (int i = 0; i < 6; i++) ImageDraw(&faces, mipmapped, faceRecs[i], (Rectangle){ 0, (float)size*i, (float)size, (float)size }, WHITE);
+
+            UnloadImage(mipmapped);
         }
 
         // NOTE: Cubemap data is expected to be provided as 6 images in a single data array,
         // one after the other (that's a vertical image), following convention: +X, -X, +Y, -Y, +Z, -Z
-        cubemap.id = rlLoadTextureCubemap(faces.data, size, faces.format);
-        if (cubemap.id == 0) TRACELOG(LOG_WARNING, "IMAGE: Failed to load cubemap image");
+        cubemap.id = rlLoadTextureCubemap(faces.data, size, faces.format, faces.mipmaps);
+
+        if (cubemap.id != 0)
+        {
+            cubemap.format = faces.format;
+            cubemap.mipmaps = 1;
+        }
+        else TRACELOG(LOG_WARNING, "IMAGE: Failed to load cubemap image");
 
         UnloadImage(faces);
     }
@@ -3302,7 +4240,7 @@ RenderTexture2D LoadRenderTexture(int width, int height)
 {
     RenderTexture2D target = { 0 };
 
-    target.id = rlLoadFramebuffer(width, height);   // Load an empty framebuffer
+    target.id = rlLoadFramebuffer(); // Load an empty framebuffer
 
     if (target.id > 0)
     {
@@ -3336,16 +4274,20 @@ RenderTexture2D LoadRenderTexture(int width, int height)
     return target;
 }
 
-// Check if a texture is ready
-bool IsTextureReady(Texture2D texture)
+// Check if a texture is valid (loaded in GPU)
+bool IsTextureValid(Texture2D texture)
 {
-    // TODO: Validate maximum texture size supported by GPU?
+    bool result = false;
 
-    return ((texture.id > 0) &&         // Validate OpenGL id
-            (texture.width > 0) &&
-            (texture.height > 0) &&     // Validate texture size
-            (texture.format > 0) &&     // Validate texture pixel format
-            (texture.mipmaps > 0));     // Validate texture mipmaps (at least 1 for basic mipmap level)
+    // TODO: Validate maximum texture size supported by GPU
+
+    if ((texture.id > 0) &&         // Validate OpenGL id (texture uplaoded to GPU)
+        (texture.width > 0) &&      // Validate texture width
+        (texture.height > 0) &&     // Validate texture height
+        (texture.format > 0) &&     // Validate texture pixel format
+        (texture.mipmaps > 0)) result = true;     // Validate texture mipmaps (at least 1 for basic mipmap level)
+
+    return result;
 }
 
 // Unload texture from GPU memory (VRAM)
@@ -3359,12 +4301,16 @@ void UnloadTexture(Texture2D texture)
     }
 }
 
-// Check if a render texture is ready
-bool IsRenderTextureReady(RenderTexture2D target)
+// Check if a render texture is valid (loaded in GPU)
+bool IsRenderTextureValid(RenderTexture2D target)
 {
-    return ((target.id > 0) &&                  // Validate OpenGL id
-            IsTextureReady(target.depth) &&     // Validate FBO depth texture/renderbuffer
-            IsTextureReady(target.texture));    // Validate FBO texture
+    bool result = false;
+
+    if ((target.id > 0) &&                  // Validate OpenGL id (loaded on GPU)
+        IsTextureValid(target.depth) &&     // Validate FBO depth texture/renderbuffer attachment
+        IsTextureValid(target.texture)) result = true; // Validate FBO texture attachment
+
+    return result;
 }
 
 // Unload render texture from GPU memory (VRAM)
@@ -3372,8 +4318,11 @@ void UnloadRenderTexture(RenderTexture2D target)
 {
     if (target.id > 0)
     {
-        // Color texture attached to FBO is deleted
-        rlUnloadTexture(target.texture.id);
+        if (target.texture.id > 0)
+        {
+            // Color texture attached to FBO is deleted
+            rlUnloadTexture(target.texture.id);
+        }
 
         // NOTE: Depth texture/renderbuffer is automatically
         // queried and deleted before deleting framebuffer
@@ -3551,6 +4500,9 @@ void DrawTexturePro(Texture2D texture, Rectangle source, Rectangle dest, Vector2
         if (source.width < 0) { flipX = true; source.width *= -1; }
         if (source.height < 0) source.y -= source.height;
 
+        if (dest.width < 0) dest.width *= -1;
+        if (dest.height < 0) dest.height *= -1;
+
         Vector2 topLeft = { 0 };
         Vector2 topRight = { 0 };
         Vector2 bottomLeft = { 0 };
@@ -3619,7 +4571,7 @@ void DrawTexturePro(Texture2D texture, Rectangle source, Rectangle dest, Vector2
 
         // NOTE: Vertex position can be transformed using matrices
         // but the process is way more costly than just calculating
-        // the vertex positions manually, like done above.
+        // the vertex positions manually, like done above
         // I leave here the old implementation for educational purposes,
         // just in case someone wants to do some performance test
         /*
@@ -3856,19 +4808,40 @@ void DrawTextureNPatch(Texture2D texture, NPatchInfo nPatchInfo, Rectangle dest,
     }
 }
 
+// Check if two colors are equal
+bool ColorIsEqual(Color col1, Color col2)
+{
+    bool result = false;
+
+    if ((col1.r == col2.r) && (col1.g == col2.g) && (col1.b == col2.b) && (col1.a == col2.a)) result = true;
+
+    return result;
+}
+
 // Get color with alpha applied, alpha goes from 0.0f to 1.0f
 Color Fade(Color color, float alpha)
 {
+    Color result = color;
+
     if (alpha < 0.0f) alpha = 0.0f;
     else if (alpha > 1.0f) alpha = 1.0f;
 
-    return (Color){ color.r, color.g, color.b, (unsigned char)(255.0f*alpha) };
+    result.a = (unsigned char)(255.0f*alpha);
+
+    return result;
 }
 
 // Get hexadecimal value for a Color
 int ColorToInt(Color color)
 {
-    return (((int)color.r << 24) | ((int)color.g << 16) | ((int)color.b << 8) | (int)color.a);
+    int result = 0;
+
+    result = (int)(((unsigned int)color.r << 24) |
+                   ((unsigned int)color.g << 16) |
+                   ((unsigned int)color.b << 8) |
+                    (unsigned int)color.a);
+
+    return result;
 }
 
 // Get color normalized as float [0..1]
@@ -3990,15 +4963,10 @@ Color ColorTint(Color color, Color tint)
 {
     Color result = color;
 
-    float cR = (float)tint.r/255;
-    float cG = (float)tint.g/255;
-    float cB = (float)tint.b/255;
-    float cA = (float)tint.a/255;
-
-    unsigned char r = (unsigned char)(((float)color.r/255*cR)*255.0f);
-    unsigned char g = (unsigned char)(((float)color.g/255*cG)*255.0f);
-    unsigned char b = (unsigned char)(((float)color.b/255*cB)*255.0f);
-    unsigned char a = (unsigned char)(((float)color.a/255*cA)*255.0f);
+    unsigned char r = (unsigned char)(((int)color.r*(int)tint.r)/255);
+    unsigned char g = (unsigned char)(((int)color.g*(int)tint.g)/255);
+    unsigned char b = (unsigned char)(((int)color.b*(int)tint.b)/255);
+    unsigned char a = (unsigned char)(((int)color.a*(int)tint.a)/255);
 
     result.r = r;
     result.g = g;
@@ -4087,10 +5055,14 @@ Color ColorContrast(Color color, float contrast)
 // Get color with alpha applied, alpha goes from 0.0f to 1.0f
 Color ColorAlpha(Color color, float alpha)
 {
+    Color result = color;
+
     if (alpha < 0.0f) alpha = 0.0f;
     else if (alpha > 1.0f) alpha = 1.0f;
 
-    return (Color){color.r, color.g, color.b, (unsigned char)(255.0f*alpha)};
+    result.a = (unsigned char)(255.0f*alpha);
+
+    return result;
 }
 
 // Get src alpha-blended into dst color with tint
@@ -4146,6 +5118,22 @@ Color ColorAlphaBlend(Color dst, Color src, Color tint)
 #endif
 
     return out;
+}
+
+// Get color lerp interpolation between two colors, factor [0.0f..1.0f]
+Color ColorLerp(Color color1, Color color2, float factor)
+{
+    Color color = { 0 };
+
+    if (factor < 0.0f) factor = 0.0f;
+    else if (factor > 1.0f) factor = 1.0f;
+
+    color.r = (unsigned char)((1.0f - factor)*color1.r + factor*color2.r);
+    color.g = (unsigned char)((1.0f - factor)*color1.g + factor*color2.g);
+    color.b = (unsigned char)((1.0f - factor)*color1.b + factor*color2.b);
+    color.a = (unsigned char)((1.0f - factor)*color1.a + factor*color2.a);
+
+    return color;
 }
 
 // Get a Color struct from hexadecimal value
@@ -4221,6 +5209,33 @@ Color GetPixelColor(void *srcPtr, int format)
             color.g = (unsigned char)(((float *)srcPtr)[1]*255.0f);
             color.b = (unsigned char)(((float *)srcPtr)[2]*255.0f);
             color.a = (unsigned char)(((float *)srcPtr)[3]*255.0f);
+
+        } break;
+        case PIXELFORMAT_UNCOMPRESSED_R16:
+        {
+            // NOTE: Pixel normalized float value is converted to [0..255]
+            color.r = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[0])*255.0f);
+            color.g = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[0])*255.0f);
+            color.b = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[0])*255.0f);
+            color.a = 255;
+
+        } break;
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16:
+        {
+            // NOTE: Pixel normalized float value is converted to [0..255]
+            color.r = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[0])*255.0f);
+            color.g = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[1])*255.0f);
+            color.b = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[2])*255.0f);
+            color.a = 255;
+
+        } break;
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+        {
+            // NOTE: Pixel normalized float value is converted to [0..255]
+            color.r = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[0])*255.0f);
+            color.g = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[1])*255.0f);
+            color.b = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[2])*255.0f);
+            color.a = (unsigned char)(HalfToFloat(((unsigned short *)srcPtr)[3])*255.0f);
 
         } break;
         default: break;
@@ -4329,6 +5344,9 @@ int GetPixelDataSize(int width, int height, int format)
         case PIXELFORMAT_UNCOMPRESSED_R32: bpp = 32; break;
         case PIXELFORMAT_UNCOMPRESSED_R32G32B32: bpp = 32*3; break;
         case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32: bpp = 32*4; break;
+        case PIXELFORMAT_UNCOMPRESSED_R16: bpp = 16; break;
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16: bpp = 16*3; break;
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16: bpp = 16*4; break;
         case PIXELFORMAT_COMPRESSED_DXT1_RGB:
         case PIXELFORMAT_COMPRESSED_DXT1_RGBA:
         case PIXELFORMAT_COMPRESSED_ETC1_RGB:
@@ -4343,7 +5361,8 @@ int GetPixelDataSize(int width, int height, int format)
         default: break;
     }
 
-    dataSize = width*height*bpp/8;  // Total data size in bytes
+    double bytesPerPixel = (double)bpp/8.0;
+    dataSize = (int)(bytesPerPixel*width*height); // Total data size in bytes
 
     // Most compressed formats works on 4x4 blocks,
     // if texture is smaller, minimum dataSize is 8 or 16
@@ -4359,6 +5378,37 @@ int GetPixelDataSize(int width, int height, int format)
 //----------------------------------------------------------------------------------
 // Module specific Functions Definition
 //----------------------------------------------------------------------------------
+// Convert half-float (stored as unsigned short) to float
+// REF: https://stackoverflow.com/questions/1659440/32-bit-to-16-bit-floating-point-conversion/60047308#60047308
+static float HalfToFloat(unsigned short x)
+{
+    float result = 0.0f;
+
+    const unsigned int e = (x & 0x7C00) >> 10; // Exponent
+    const unsigned int m = (x & 0x03FF) << 13; // Mantissa
+    const float fm = (float)m;
+    const unsigned int v = (*(unsigned int*)&fm) >> 23; // Evil log2 bit hack to count leading zeros in denormalized format
+    const unsigned int r = (x & 0x8000) << 16 | (e != 0)*((e + 112) << 23 | m) | ((e == 0)&(m != 0))*((v - 37) << 23 | ((m << (150 - v)) & 0x007FE000)); // sign : normalized : denormalized
+
+    result = *(float *)&r;
+
+    return result;
+}
+
+// Convert float to half-float (stored as unsigned short)
+static unsigned short FloatToHalf(float x)
+{
+    unsigned short result = 0;
+
+    const unsigned int b = (*(unsigned int*) & x) + 0x00001000; // Round-to-nearest-even: add last bit after truncated mantissa
+    const unsigned int e = (b & 0x7F800000) >> 23; // Exponent
+    const unsigned int m = b & 0x007FFFFF; // Mantissa; in line below: 0x007FF000 = 0x00800000-0x00001000 = decimal indicator flag - initial rounding
+
+    result = (b & 0x80000000) >> 16 | (e > 112)*((((e - 112) << 10) & 0x7C00) | m >> 13) | ((e < 113) & (e > 101))*((((0x007FF000 + m) >> (125 - e)) + 1) >> 1) | (e > 143)*0x7FFF; // sign : normalized : denormalized : saturate
+
+    return result;
+}
+
 // Get pixel data from image as Vector4 array (float normalized)
 static Vector4 *LoadImageDataNormalized(Image image)
 {
@@ -4461,7 +5511,32 @@ static Vector4 *LoadImageDataNormalized(Image image)
                     pixels[i].w = ((float *)image.data)[k + 3];
 
                     k += 4;
-                }
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16:
+                {
+                    pixels[i].x = HalfToFloat(((unsigned short *)image.data)[k]);
+                    pixels[i].y = 0.0f;
+                    pixels[i].z = 0.0f;
+                    pixels[i].w = 1.0f;
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16:
+                {
+                    pixels[i].x = HalfToFloat(((unsigned short *)image.data)[k]);
+                    pixels[i].y = HalfToFloat(((unsigned short *)image.data)[k + 1]);
+                    pixels[i].z = HalfToFloat(((unsigned short *)image.data)[k + 2]);
+                    pixels[i].w = 1.0f;
+
+                    k += 3;
+                } break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                {
+                    pixels[i].x = HalfToFloat(((unsigned short *)image.data)[k]);
+                    pixels[i].y = HalfToFloat(((unsigned short *)image.data)[k + 1]);
+                    pixels[i].z = HalfToFloat(((unsigned short *)image.data)[k + 2]);
+                    pixels[i].w = HalfToFloat(((unsigned short *)image.data)[k + 3]);
+
+                    k += 4;
+                } break;
                 default: break;
             }
         }

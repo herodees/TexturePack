@@ -6,7 +6,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2018-2023 Ahmad Fatoum & Ramon Santamaria (@raysan5)
+*   Copyright (c) 2018-2024 Ahmad Fatoum & Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -45,6 +45,8 @@
 #define SUPPORT_CAMERA_SYSTEM           1
 // Gestures module is included (rgestures.h) to support gestures detection: tap, hold, swipe, drag
 #define SUPPORT_GESTURES_SYSTEM         1
+// Include pseudo-random numbers generator (rprand.h), based on Xoshiro128** and SplitMix64
+#define SUPPORT_RPRAND_GENERATOR        1
 // Mouse gestures are directly mapped like touches and processed by gestures system
 #define SUPPORT_MOUSE_GESTURES          1
 // Reconfigure standard input to receive key inputs, works with SSH connection.
@@ -55,9 +57,7 @@
 // Use busy wait loop for timing sync, if not defined, a high-resolution timer is set up and used
 //#define SUPPORT_BUSY_WAIT_LOOP          1
 // Use a partial-busy wait loop, in this case frame sleeps for most of the time, but then runs a busy loop at the end for accuracy
-#define SUPPORT_PARTIALBUSY_WAIT_LOOP
-// Wait for events passively (sleeping while no events) instead of polling them actively every frame
-//#define SUPPORT_EVENTS_WAITING          1
+#define SUPPORT_PARTIALBUSY_WAIT_LOOP    1
 // Allow automatic screen capture of current screen pressing F12, defined in KeyCallback()
 #define SUPPORT_SCREEN_CAPTURE          1
 // Allow automatic gif recording of current screen pressing CTRL+F12, defined in KeyCallback()
@@ -65,11 +65,12 @@
 // Support CompressData() and DecompressData() functions
 #define SUPPORT_COMPRESSION_API         1
 // Support automatic generated events, loading and recording of those events when required
-//#define SUPPORT_EVENTS_AUTOMATION       1
-// Support custom frame control, only for advance users
+#define SUPPORT_AUTOMATION_EVENTS       1
+// Support custom frame control, only for advanced users
 // By default EndDrawing() does this job: draws everything + SwapScreenBuffer() + manage frame timing + PollInputEvents()
 // Enabling this flag allows manual control of the frame processes, use at your own risk
 //#define SUPPORT_CUSTOM_FRAME_CONTROL    1
+
 
 // rcore: Configuration values
 //------------------------------------------------------------------------------------
@@ -81,12 +82,14 @@
 #define MAX_GAMEPADS                    4       // Maximum number of gamepads supported
 #define MAX_GAMEPAD_AXIS                8       // Maximum number of axis supported (per gamepad)
 #define MAX_GAMEPAD_BUTTONS            32       // Maximum number of buttons supported (per gamepad)
+#define MAX_GAMEPAD_VIBRATION_TIME      2.0f    // Maximum vibration time in seconds
 #define MAX_TOUCH_POINTS                8       // Maximum number of touch points supported
 #define MAX_KEY_PRESSED_QUEUE          16       // Maximum number of keys in the key input queue
 #define MAX_CHAR_PRESSED_QUEUE         16       // Maximum number of characters in the char input queue
 
 #define MAX_DECOMPRESSION_SIZE         64       // Max size allocated for decompression in MB
 
+#define MAX_AUTOMATION_EVENTS       16384       // Maximum number of automation events to record
 
 //------------------------------------------------------------------------------------
 // Module: rlgl - Configuration values
@@ -97,6 +100,8 @@
 
 // Show OpenGL extensions and capabilities detailed logs on init
 //#define RLGL_SHOW_GL_DETAILS_INFO              1
+
+#define RL_SUPPORT_MESH_GPU_SKINNING           1      // GPU skinning, comment if your GPU does not support more than 8 VBOs
 
 //#define RL_DEFAULT_BATCH_BUFFER_ELEMENTS    4096    // Default internal render batch elements limits
 #define RL_DEFAULT_BATCH_BUFFERS               1      // Default number of batch buffers (multi-buffering)
@@ -110,14 +115,27 @@
 #define RL_CULL_DISTANCE_NEAR               0.01      // Default projection matrix near cull distance
 #define RL_CULL_DISTANCE_FAR              1000.0      // Default projection matrix far cull distance
 
+// Default shader vertex attribute locations
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION    0
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD    1
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL      2
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR       3
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_TANGENT     4
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD2   5
+#define RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES     6
+#if defined(RL_SUPPORT_MESH_GPU_SKINNING)
+    #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEIDS     7
+    #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS 8
+#endif
+
 // Default shader vertex attribute names to set location points
 // NOTE: When a new shader is loaded, the following locations are tried to be set for convenience
-#define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION     "vertexPosition"    // Bound by default to shader location: 0
-#define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD     "vertexTexCoord"    // Bound by default to shader location: 1
-#define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL       "vertexNormal"      // Bound by default to shader location: 2
-#define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR        "vertexColor"       // Bound by default to shader location: 3
-#define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT      "vertexTangent"     // Bound by default to shader location: 4
-#define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2    "vertexTexCoord2"   // Bound by default to shader location: 5
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION     "vertexPosition"    // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD     "vertexTexCoord"    // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL       "vertexNormal"      // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR        "vertexColor"       // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT      "vertexTangent"     // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_TANGENT
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2    "vertexTexCoord2"   // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD2
 
 #define RL_DEFAULT_SHADER_UNIFORM_NAME_MVP         "mvp"               // model-view-projection matrix
 #define RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW        "matView"           // view matrix
@@ -137,26 +155,29 @@
 // Some lines-based shapes could still use lines
 #define SUPPORT_QUADS_DRAW_MODE         1
 
+// rshapes: Configuration values
+//------------------------------------------------------------------------------------
+#define SPLINE_SEGMENT_DIVISIONS       24       // Spline segments subdivisions
+
 
 //------------------------------------------------------------------------------------
 // Module: rtextures - Configuration Flags
 //------------------------------------------------------------------------------------
-// Select the desired fileformats to be supported for image data loading
-#define SUPPORT_FILEFORMAT_PNG          1
-#define SUPPORT_FILEFORMAT_BMP          1
-#define SUPPORT_FILEFORMAT_TGA          1
-#define SUPPORT_FILEFORMAT_JPG          1
-#define SUPPORT_FILEFORMAT_GIF          1
-#define SUPPORT_FILEFORMAT_QOI          1
-#define SUPPORT_FILEFORMAT_PSD          1
-#define SUPPORT_FILEFORMAT_DDS          1
-#define SUPPORT_FILEFORMAT_HDR          1
+// Selecte desired fileformats to be supported for image data loading
+#define SUPPORT_FILEFORMAT_PNG      1
+//#define SUPPORT_FILEFORMAT_BMP      1
+//#define SUPPORT_FILEFORMAT_TGA      1
+//#define SUPPORT_FILEFORMAT_JPG      1
+#define SUPPORT_FILEFORMAT_GIF      1
+#define SUPPORT_FILEFORMAT_QOI      1
+//#define SUPPORT_FILEFORMAT_PSD      1
+#define SUPPORT_FILEFORMAT_DDS      1
+//#define SUPPORT_FILEFORMAT_HDR      1
 //#define SUPPORT_FILEFORMAT_PIC          1
-//#define SUPPORT_FILEFORMAT_PNM          1
-//#define SUPPORT_FILEFORMAT_KTX          1
-//#define SUPPORT_FILEFORMAT_ASTC         1
-//#define SUPPORT_FILEFORMAT_PKM          1
-//#define SUPPORT_FILEFORMAT_PVR          1
+//#define SUPPORT_FILEFORMAT_KTX      1
+//#define SUPPORT_FILEFORMAT_ASTC     1
+//#define SUPPORT_FILEFORMAT_PKM      1
+//#define SUPPORT_FILEFORMAT_PVR      1
 
 // Support image export functionality (.png, .bmp, .tga, .jpg, .qoi)
 #define SUPPORT_IMAGE_EXPORT            1
@@ -174,12 +195,18 @@
 // NOTE: If enabled, uses external module functions to load default raylib font
 #define SUPPORT_DEFAULT_FONT            1
 // Selected desired font fileformats to be supported for loading
-#define SUPPORT_FILEFORMAT_FNT          1
 #define SUPPORT_FILEFORMAT_TTF          1
+#define SUPPORT_FILEFORMAT_FNT          1
+//#define SUPPORT_FILEFORMAT_BDF          1
 
 // Support text management functions
 // If not defined, still some functions are supported: TextLength(), TextFormat()
 #define SUPPORT_TEXT_MANIPULATION       1
+
+// On font atlas image generation [GenImageFontAtlas()], add a 3x3 pixels white rectangle
+// at the bottom-right corner of the atlas. It can be useful to for shapes drawing, to allow
+// drawing text and shapes with a single draw call [SetShapesTexture()].
+#define SUPPORT_FONT_ATLAS_WHITE_REC    1
 
 // rtext: Configuration values
 //------------------------------------------------------------------------------------
@@ -205,7 +232,12 @@
 // rmodels: Configuration values
 //------------------------------------------------------------------------------------
 #define MAX_MATERIAL_MAPS              12       // Maximum number of shader maps supported
+
+#ifdef RL_SUPPORT_MESH_GPU_SKINNING
+#define MAX_MESH_VERTEX_BUFFERS         9       // Maximum vertex buffers (VBO) per mesh
+#else
 #define MAX_MESH_VERTEX_BUFFERS         7       // Maximum vertex buffers (VBO) per mesh
+#endif
 
 //------------------------------------------------------------------------------------
 // Module: raudio - Configuration Flags
@@ -240,5 +272,32 @@
 // utils: Configuration values
 //------------------------------------------------------------------------------------
 #define MAX_TRACELOG_MSG_LENGTH       256       // Max length of one trace-log message
+
+
+// Enable partial support for clipboard image, only working on SDL3 or
+// being on both Windows OS + GLFW or Windows OS + RGFW
+#define SUPPORT_CLIPBOARD_IMAGE    1
+
+#if defined(SUPPORT_CLIPBOARD_IMAGE)
+    #ifndef STBI_REQUIRED
+        #define STBI_REQUIRED
+    #endif
+
+    #ifndef SUPPORT_FILEFORMAT_BMP // For clipboard image on Windows
+        #define SUPPORT_FILEFORMAT_BMP 1
+    #endif
+
+    #ifndef SUPPORT_FILEFORMAT_PNG // Wayland uses png for prints, at least it was on 22 LTS ubuntu
+        #define SUPPORT_FILEFORMAT_PNG 1
+    #endif
+
+    #ifndef SUPPORT_FILEFORMAT_JPG
+        #define SUPPORT_FILEFORMAT_JPG 1
+    #endif
+
+    #ifndef SUPPORT_MODULE_RTEXTURES
+        #define SUPPORT_MODULE_RTEXTURES 1
+    #endif
+#endif
 
 #endif // CONFIG_H

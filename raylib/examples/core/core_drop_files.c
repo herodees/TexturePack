@@ -9,7 +9,7 @@
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *   BSD-like license that allows static linking with closed source software
 *
-*   Copyright (c) 2015-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2015-2024 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -53,7 +53,7 @@ int main(void)
         {
             FilePathList droppedFiles = LoadDroppedFiles();
 
-            for (int i = 0, offset = filePathCounter; i < droppedFiles.count; i++)
+            for (int i = 0, offset = filePathCounter; i < (int)droppedFiles.count; i++)
             {
                 if (filePathCounter < (MAX_FILEPATH_RECORDED - 1))
                 {
@@ -77,7 +77,7 @@ int main(void)
             {
                 DrawText("Dropped files:", 100, 40, 20, DARKGRAY);
 
-                for (unsigned int i = 0; i < filePathCounter; i++)
+                for (int i = 0; i < filePathCounter; i++)
                 {
                     if (i%2 == 0) DrawRectangle(0, 85 + 40*i, screenWidth, 40, Fade(LIGHTGRAY, 0.5f));
                     else DrawRectangle(0, 85 + 40*i, screenWidth, 40, Fade(LIGHTGRAY, 0.3f));

@@ -54,7 +54,7 @@
     raylib-parser is licensed under an unmodified zlib/libpng license, which is an OSI-certified,
     BSD-like license that allows static linking with closed source software:
 
-    Copyright (c) 2021-2023 Ramon Santamaria (@raysan5)
+    Copyright (c) 2021-2024 Ramon Santamaria (@raysan5)
 
 **********************************************************************************************/
 
@@ -72,7 +72,7 @@
 #define MAX_CALLBACKS_TO_PARSE    64    // Maximum number of callbacks to parse
 #define MAX_FUNCS_TO_PARSE      1024    // Maximum number of functions to parse
 
-#define MAX_LINE_LENGTH          512    // Maximum length of one line (including comments)
+#define MAX_LINE_LENGTH         1024    // Maximum length of one line (including comments)
 
 #define MAX_STRUCT_FIELDS         64    // Maximum number of struct fields
 #define MAX_ENUM_VALUES          512    // Maximum number of enum values
@@ -139,7 +139,7 @@ typedef struct EnumInfo {
 // Function info data
 typedef struct FunctionInfo {
     char name[64];              // Function name
-    char desc[128];             // Function description (comment at the end)
+    char desc[512];             // Function description (comment at the end)
     char retType[32];           // Return value type
     int paramCount;             // Number of function parameters
     char paramType[MAX_FUNCTION_PARAMETERS][32];   // Parameters type
@@ -169,9 +169,11 @@ static FunctionInfo *funcs = NULL;
 // Command line variables
 static char apiDefine[32] = { 0 };         // Functions define (i.e. RLAPI for raylib.h, RMDEF for raymath.h, etc.)
 static char truncAfter[32] = { 0 };        // Truncate marker (i.e. "RLGL IMPLEMENTATION" for rlgl.h)
-static char inFileName[512] = { 0 };       // Input file name (required in case of provided through CLI)
-static char outFileName[512] = { 0 };      // Output file name (required for file save/export)
 static int outputFormat = DEFAULT;
+
+// NOTE: Max length depends on OS, in Windows MAX_PATH = 256
+static char inFileName[512] = { 0 };        // Input file name (required in case of drag & drop over executable)
+static char outFileName[512] = { 0 };       // Output file name (required for file save/export)
 
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
@@ -200,9 +202,12 @@ int main(int argc, char* argv[])
 {
     if (argc > 1) ProcessCommandLine(argc, argv);
 
-    if (inFileName[0] == '\0') MemoryCopy(inFileName, "../src/raylib.h\0", 16);
-    if (outFileName[0] == '\0') MemoryCopy(outFileName, "raylib_api.txt\0", 15);
-    if (apiDefine[0] == '\0') MemoryCopy(apiDefine, "RLAPI\0", 6);
+    const char *raylibhPath = "../src/raylib.h\0";
+    const char *raylibapiPath = "raylib_api.txt\0";
+    const char *rlapiPath = "RLAPI\0";
+    if (inFileName[0] == '\0') MemoryCopy(inFileName, raylibhPath, TextLength(raylibhPath) + 1);
+    if (outFileName[0] == '\0') MemoryCopy(outFileName, raylibapiPath, TextLength(raylibapiPath) + 1);
+    if (apiDefine[0] == '\0') MemoryCopy(apiDefine, rlapiPath, TextLength(rlapiPath) + 1);
 
     int length = 0;
     char *buffer = LoadFileText(inFileName, &length);
@@ -445,11 +450,11 @@ int main(int argc, char* argv[])
             {
                 if (isFloat)
                 {
-                    defines[defineIndex].type = linePtr[j-1] == 'f' ? FLOAT : DOUBLE;
+                    defines[defineIndex].type = (linePtr[j-1] == 'f')? FLOAT : DOUBLE;
                 }
                 else
                 {
-                    defines[defineIndex].type = linePtr[j-1] == 'L' ? LONG : INT;
+                    defines[defineIndex].type = (linePtr[j-1] == 'L')? LONG : INT;
                     defines[defineIndex].isHex = isHex;
                 }
             }
@@ -499,7 +504,7 @@ int main(int argc, char* argv[])
                     (ch == '/') ||
                     (ch == ' ') ||
                     (ch == '\t')) continue;
-                
+
                 // Read number operand
                 else if (isdigit(ch))
                 {
@@ -532,9 +537,9 @@ int main(int argc, char* argv[])
                     {
                         // Found a valid number -> update largestType
                         int numberType;
-                        if (isFloat) numberType = valuePtr[c - 1] == 'f' ? FLOAT_MATH : DOUBLE_MATH;
-                        else numberType = valuePtr[c - 1] == 'L' ? LONG_MATH : INT_MATH;
-                        
+                        if (isFloat) numberType = (valuePtr[c - 1] == 'f')? FLOAT_MATH : DOUBLE_MATH;
+                        else numberType = (valuePtr[c - 1] == 'L')? LONG_MATH : INT_MATH;
+
                         if (numberType > largestType) largestType = numberType;
                     }
                     else
@@ -654,7 +659,7 @@ int main(int argc, char* argv[])
                     {
                         if (structs[i].fieldName[originalIndex][c] == ',') additionalFields++;
                     }
-                    
+
                     if (additionalFields > 0)
                     {
                         int originalLength = -1;
@@ -702,7 +707,7 @@ int main(int argc, char* argv[])
                     {
                         if (structs[i].fieldType[originalIndex][c] == ',') additionalFields++;
                     }
-                    
+
                     if (additionalFields > 0)
                     {
                         // Copy original name to last additional field
@@ -1004,8 +1009,14 @@ int main(int argc, char* argv[])
             {
                 funcEnd = c + 2;
 
-                // Check if previous word is void
-                if ((linePtr[c - 4] == 'v') && (linePtr[c - 3] == 'o') && (linePtr[c - 2] == 'i') && (linePtr[c - 1] == 'd')) break;
+                // Check if there are no parameters
+                if ((funcEnd - funcParamsStart == 2) ||
+                    ((linePtr[c - 4] == 'v') &&
+                     (linePtr[c - 3] == 'o') &&
+                     (linePtr[c - 2] == 'i') &&
+                     (linePtr[c - 1] == 'd'))) {
+                  break;
+                }
 
                 // Get parameter type + name, extract info
                 char funcParamTypeName[128] = { 0 };
@@ -1073,7 +1084,7 @@ static void ShowCommandLineInfo(void)
     printf("//                                                                              //\n");
     printf("// more info and bugs-report: github.com/raysan5/raylib/parser                  //\n");
     printf("//                                                                              //\n");
-    printf("// Copyright (c) 2021-2023 Ramon Santamaria (@raysan5)                          //\n");
+    printf("// Copyright (c) 2021-2024 Ramon Santamaria (@raysan5)                          //\n");
     printf("//                                                                              //\n");
     printf("//////////////////////////////////////////////////////////////////////////////////\n\n");
 
@@ -1089,7 +1100,7 @@ static void ShowCommandLineInfo(void)
     printf("                                      NOTE: If not specified, defaults to: raylib_api.txt\n\n");
     printf("    -f, --format <type>             : Define output format for parser data.\n");
     printf("                                      Supported types: DEFAULT, JSON, XML, LUA, CODE\n\n");
-    printf("    -d, --define <DEF>              : Define functions specifiers (i.e. RLAPI for raylib.h, RMDEF for raymath.h, etc.)\n");
+    printf("    -d, --define <DEF>              : Define functions specifiers (i.e. RLAPI for raylib.h, RMAPI for raymath.h, etc.)\n");
     printf("                                      NOTE: If no specifier defined, defaults to: RLAPI\n\n");
     printf("    -t, --truncate <after>          : Define string to truncate input after (i.e. \"RLGL IMPLEMENTATION\" for rlgl.h)\n");
     printf("                                      NOTE: If not specified, the full input file is parsed.\n\n");
@@ -1099,7 +1110,7 @@ static void ShowCommandLineInfo(void)
     printf("        Process <raylib.h> to generate <api.json>\n\n");
     printf("    > raylib_parser --output raylib_data.info --format XML\n");
     printf("        Process <raylib.h> to generate <raylib_data.info> as XML text data\n\n");
-    printf("    > raylib_parser --input raymath.h --output raymath_data.info --format XML\n");
+    printf("    > raylib_parser --input raymath.h --output raymath_data.info --format XML --define RMAPI\n");
     printf("        Process <raymath.h> to generate <raymath_data.info> as XML text data\n\n");
 }
 
@@ -1235,7 +1246,7 @@ static char **GetTextLines(const char *buffer, int length, int *linesCount)
         while ((bufferPtr[index] == ' ') || (bufferPtr[index] == '\t')) index++;
 
         int j = 0;
-        while (bufferPtr[index + j] != '\n')
+        while (bufferPtr[index + j] != '\n' && bufferPtr[index + j] != '\0')
         {
             lines[i][j] = bufferPtr[index + j];
             j++;
@@ -1269,8 +1280,10 @@ static void GetDataTypeAndName(const char *typeName, int typeNameLen, char *type
         }
         else if ((typeName[k] == '.') && (typeNameLen == 3)) // Handle varargs ...);
         {
-            MemoryCopy(type, "...", 3);
-            MemoryCopy(name, "args", 4);
+	    const char *varargsDots = "...";
+	    const char *varargsArg = "args";
+            MemoryCopy(type, varargsDots, TextLength(varargsDots));
+            MemoryCopy(name, varargsArg, TextLength(varargsArg));
             break;
         }
     }

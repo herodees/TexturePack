@@ -7,7 +7,7 @@
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *   BSD-like license that allows static linking with closed source software
 *
-*   Copyright (c) 2017-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2017-2024 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -36,7 +36,7 @@ int main(void)
 
     Model models[NUM_MODELS] = { 0 };
 
-    models[0] = LoadModelFromMesh(GenMeshPlane(2, 2, 5, 5));
+    models[0] = LoadModelFromMesh(GenMeshPlane(2, 2, 4, 3));
     models[1] = LoadModelFromMesh(GenMeshCube(2.0f, 1.0f, 2.0f));
     models[2] = LoadModelFromMesh(GenMeshSphere(2, 32, 32));
     models[3] = LoadModelFromMesh(GenMeshHemiSphere(2, 16, 16));

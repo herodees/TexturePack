@@ -7,7 +7,7 @@
 *   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 *   BSD-like license that allows static linking with closed source software
 *
-*   Copyright (c) 2018-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2018-2024 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -134,7 +134,8 @@ int main(void)
                            (Vector2){ 0, 0 }, 0.0f, WHITE);
 
             // Draw player current tile
-            DrawText(TextFormat("Current tile: [%i,%i]", playerTileX, playerTileY), 10, 10, 20, LIME);
+            DrawText(TextFormat("Current tile: [%i,%i]", playerTileX, playerTileY), 10, 10, 20, RAYWHITE);
+            DrawText("ARROW KEYS to move", 10, screenHeight-25, 20, RAYWHITE);
 
         EndDrawing();
         //----------------------------------------------------------------------------------
