@@ -23,6 +23,9 @@ int  main(int argc, char* argv[])
 
     box::app _app;
 
+    if (argc > 1)
+        _app.open_atlas(argv[1]);
+
     // Main game loop
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
@@ -31,10 +34,6 @@ int  main(int argc, char* argv[])
 
         // start ImGui Conent
         rlImGuiBegin();
-
-        // show ImGui Content
-         bool open = true;
-       //  ImGui::ShowDemoWindow(&open);
 
         ShowDock(_app);
 

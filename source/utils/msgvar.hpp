@@ -134,6 +134,7 @@ namespace box::msg
 			double           get(double def) const;
 			const char*      get(const char* def) const;
 			std::string_view get(std::string_view def) const;
+            double           get_number(double def) const;
 
 			std::string_view str() const;
 			const char* c_str() const;
@@ -1160,7 +1161,20 @@ namespace box::msg
 			if (_tag == Tag::Id)
 				return _str;
 			return def;
-		}
+        }
+
+        inline double Var::get_number(double def) const
+        {
+            if (_tag == Tag::Int32)
+                return _u32;
+            if (_tag == Tag::Int64)
+                return double(_u64);
+            if (_tag == Tag::Flt32)
+                return _flt32;
+            if (_tag == Tag::Flt64)
+                return _flt64;
+            return def;
+        }
 
 		inline Var::Tag Var::get_tag() const
 		{

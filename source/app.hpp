@@ -29,10 +29,10 @@ namespace box
     {
         struct node
         {
-            float   _rotation{};
-            point2f _scale;
-            point2f _position;
-            sprite* _sprite;
+            float         _rotation{0.f};
+            point2f       _scale{1.f, 1.f};
+            point2f       _position;
+            const sprite* _sprite{};
         };
         std::vector<node> _nodes;
     };
@@ -65,6 +65,7 @@ namespace box
         void show_properties();
         void show_atlas_properties();
         void show_composite_properties();
+        void show_node_properties();
         void show_sprite_properties();
         void show_list();
         void show_composition();
@@ -78,11 +79,15 @@ namespace box
         bool add_files();
         bool add_composition(const char* path);
         bool remove_composition(composition* spr);
+        bool remove_composition_node(composition* spr, int32_t node);
+        bool move_composition_node(composition* spr, int32_t& node, int dir);
         bool remove_file(sprite* spr);
+        std::string_view get_sprite_id(const sprite* spr) const;
+        const sprite* get_sprite(std::string_view spr) const;
         bool repack();
         void reset();
 
-        void set_atlas_scale(const ImVec2& scale, const ImVec2& world_point);
+        void set_atlas_scale(canvas_data& canvas, const ImVec2& scale, const ImVec2& world_point);
 
         Image    load_cb64(msg::Var ar) const;
         msg::Var save_cb64(Image img) const;
@@ -91,6 +96,8 @@ namespace box
         std::map<std::string, composition> _compositions;
         sprite*                       _active{};
         composition*                  _active_comp{};
+        int32_t                       _active_node{-1};
+        composition::node             _drag_node{};
         drag_data                     _drag{};
         std::string                   _active_name;
         std::string                   _active_comp_name;
@@ -104,6 +111,7 @@ namespace box
         int32_t                       _trimed_height{512};
         bool                          _trim{};
         bool                          _embed{};
+        bool                          _drop_node{};
         bool                          _visible_origin{};
         bool                          _visible_region{true};
         bool                          _visible_index{};

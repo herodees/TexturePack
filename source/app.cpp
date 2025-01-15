@@ -110,6 +110,20 @@ namespace box
             {
                 show_composite_properties();
             }
+
+            bool visible = true;
+
+            if (_active_comp && (size_t)_active_node < _active_comp->_nodes.size() &&
+                ImGui::CollapsingHeader("Node", &visible, ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                show_node_properties();
+            }
+
+            if (!visible)
+            {
+                remove_composition_node(_active_comp, _active_node);
+            }
+
         }
         ImGui::EndChildFrame();
 
@@ -204,7 +218,7 @@ namespace box
     {
         if (ImGui::BeginTable("##cmpprop",
                               2,
-                              ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY))
+                              ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, {0,100}))
         {
             ItemLabel("Name");
             ImGui::InputText("##sn", &_active_comp_name);
@@ -229,6 +243,48 @@ namespace box
                 }
             }
 
+            ImGui::EndTable();
+        }
+    }
+
+    void app::show_node_properties()
+    {
+        auto& node = _active_comp->_nodes[_active_node];
+
+        if (ImGui::BeginTable("##ndeprop",
+                              2,
+                              ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY))
+        {
+            ItemLabel("X");
+            ImGui::DragFloat("##nposx", &node._position.x);
+
+            ItemLabel("Y");
+            ImGui::DragFloat("##nposy", &node._position.y);
+
+            ItemLabel("Scale X");
+            ImGui::DragFloat("##nsclx", &node._scale.x, 0.1f);
+
+            ItemLabel("Scale Y");
+            ImGui::DragFloat("##nscly", &node._scale.y, 0.1f);
+
+            ItemLabel("Angle");
+            ImGui::DragFloat("##nrot", &node._rotation);
+
+
+            ImGui::TableNextRow();
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::AlignTextToFramePadding();
+            if (ImGui::Button("Up", {-1, 0}))
+            {
+                move_composition_node(_active_comp, _active_node, 1);
+            }
+            ImGui::TableSetColumnIndex(1);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            if (ImGui::Button("Down", {-1, 0}))
+            {
+                move_composition_node(_active_comp, _active_node, -1);
+            }
             ImGui::EndTable();
         }
     }
@@ -351,6 +407,14 @@ namespace box
                     _active      = &spr.second;
                     _active_name = spr.first;
                 }
+
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+                {
+                    _drag_node._sprite = &spr.second;
+                    ImGui::SetDragDropPayload("SPRITE", &_drag_node._sprite, sizeof(sprite*));
+                    ImGui::EndDragDropSource();
+                }
+
                 ImGui::SameLine();
                 ImGui::Image((ImTextureID)&spr.second._txt,
                              ImVec2(scle * spr.second._txt.width, scle * spr.second._txt.height));
@@ -359,6 +423,8 @@ namespace box
 
                 ImGui::PopStyleColor();
                 ImGui::PopID();
+
+
                 ++index;
             }
         }
@@ -439,7 +505,7 @@ namespace box
             ImGui::SetNextItemWidth(200);
             if (ImGui::SliderFloat("##zm", &canvas._zoom, 0.1f, 5.f))
             {
-                set_atlas_scale({canvas._zoom, canvas._zoom}, {0, 0});
+                set_atlas_scale(canvas, {canvas._zoom, canvas._zoom}, {0, 0});
             }
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_EXPAND))
@@ -473,6 +539,21 @@ namespace box
             }
             ImGui::EndChild();
 
+            if (_drop_node)
+            {
+                _drag_node._sprite = nullptr;
+                _drop_node         = false;
+            }
+
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (ImGui::AcceptDragDropPayload("SPRITE"))
+                {
+                    _drop_node         = true;
+                }
+                ImGui::EndDragDropTarget();
+            }
+
             ImGui::PopStyleVar(2);
         }
 
@@ -504,160 +585,263 @@ namespace box
         bool hover = false;
         dc->Flags  = ImDrawListFlags_None;
 
-       //dc->AddRectFilled(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x1fffffff);
-        dc->AddImage((ImTextureID)&_alpha_txt,
-                     local.transformPoint(ImVec2()),
-                     local.transformPoint(txtsize),
-                     {0, 0},
-                     {txtsize.x / 16.f, txtsize.y / 16.f},
-                     0x3fffffff);
-        dc->AddRect(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x5fffffff);
-
-        auto draw_origin = [dc](ImVec2 origin, uint32_t clr)
-            {
-            dc->AddLine(origin - ImVec2(0, 10), origin + ImVec2(0, 10), clr);
-            dc->AddLine(origin - ImVec2(10, 0), origin + ImVec2(10, 0), clr);
-            dc->AddRect(origin - ImVec2(3, 3), origin + ImVec2(4, 4), clr);
-            };
-
-        int index = 0;
-        for (auto& spr : _items)
+        if (_composite_mode)
         {
-            ++index;
-            if (!spr.second._packed)
-                continue;
-            bool isactive = _active == nullptr || _active == &spr.second;
+            dc->AddLine(local.transformPoint(ImVec2(0, -10000)), local.transformPoint(ImVec2(0, 10000)), 0xff0000ff);
+            dc->AddLine(local.transformPoint(ImVec2(-10000,0)), local.transformPoint(ImVec2(10000,0)), 0xff00ff00);
 
-            const uint32_t al = isactive ? 0xffffffff : 0x5fffffff;
-            ImVec2 p1(spr.second._region.x, spr.second._region.y);
-            ImVec2 p2(spr.second._region.x + spr.second._region.width, spr.second._region.y + spr.second._region.height);
-            dc->AddImage((ImTextureID)&spr.second._txt,
-                         local.transformPoint(p1), local.transformPoint(p2),
-                         {0, 0},
-                         {1, 1},
-                         al);
-
-            auto clr = bgclr;
-
-            if (_mouse.x >= p1.x && _mouse.x < p2.x && _mouse.y >= p1.y && _mouse.y < p2.y)
+            if (_active_comp)
             {
-                hover = true;
-                clr = flclr;
-                if (IsMouseButtonPressed(0) && !_drag._hovered_active[0] && !_drag._hovered_active[1])
+                composition::node* active_node = nullptr;
+                ImVec2 active_node_pos[4];
+
+                auto draw_node = [&](composition::node& el, bool lines)
                 {
-                    _active      = &spr.second;
-                    _active_name = spr.first;
+                        bool active = _active_node == (int32_t)std::distance(_active_comp->_nodes.data(), &el);
+
+                        matrix2d tr(el._position, el._scale, point2f{el._sprite->_oxa, el._sprite->_oya}, el._rotation);
+                        auto     lpos = tr.inverseTransformPoint(_mouse);
+                        tr = local * tr;
+
+                        if (lpos.x >= 0 &&
+                            lpos.y >= 0 &&
+                            lpos.x < el._sprite->_region.width &&
+                            lpos.y < el._sprite->_region.height)
+                        {
+                            active_node = &el;
+                        }
+
+                        dc->PushTextureID((ImTextureID)&el._sprite->_txt);
+                        dc->PrimReserve(6, 4);
+
+                        ImVec2 pos[4];
+                        pos[0] = tr.transformPoint(ImVec2{0, 0});
+                        pos[1] = tr.transformPoint(ImVec2{0, el._sprite->_region.height});
+                        pos[2] = tr.transformPoint(ImVec2{el._sprite->_region.width, el._sprite->_region.height});
+                        pos[3] = tr.transformPoint(ImVec2{el._sprite->_region.width, 0});
+
+                        if (active_node == &el)
+                        {
+                            active_node_pos[0] = pos[0];
+                            active_node_pos[1] = pos[1];
+                            active_node_pos[2] = pos[2];
+                            active_node_pos[3] = pos[3];
+                        }
+
+                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx));
+                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 1));
+                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 2));
+                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx));
+                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 2));
+                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 3));
+                        dc->PrimWriteVtx(pos[0], {0.f, 0.f}, 0xffffffff);
+                        dc->PrimWriteVtx(pos[1], {0.f, 1.f}, 0xffffffff);
+                        dc->PrimWriteVtx(pos[2], {1.f, 1.f}, 0xffffffff);
+                        dc->PrimWriteVtx(pos[3], {1.f, 0.f}, 0xffffffff);
+                        dc->PopTextureID();
+
+                        dc->AddPolyline(pos, 4, active ? 0xffffffff : 0x5fffffff, ImDrawFlags_Closed, 1.f);
+                    };
+
+                for (auto& el : _active_comp->_nodes)
+                {
+                    if (el._sprite)
+                        draw_node(el, false);
                 }
-            }
 
-            if (_visible_region || _active == &spr.second)
-            {
-                dc->AddRect(local.transformPoint(p1), local.transformPoint(p2), clr);
-            }
-
-            if (_visible_index || _active == &spr.second)
-            {
-                dc->AddText(local.transformPoint(p1) + ImVec2{2, 1}, clr, TextFormat("%d", index));
-            }
-
-            if (_visible_origin || _active == &spr.second)
-            {
-                auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._oxa), float(spr.second._oya)});
-                origin -= ImVec2(1, 1);
-                auto origin2 = local.transformPoint(p1 + ImVec2{float(spr.second._oxb), float(spr.second._oyb)});
-                origin2 -= ImVec2(1, 1);
-
-                clr = flclr;
-                if (_active == &spr.second)
+                if (active_node)
                 {
-                    _drag._hovered_active[0] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
-                                                                    spr.second._region.y + spr.second._oya}) <
-                                               pow2(8 / canvas._zoom);
+                    dc->AddPolyline(active_node_pos, 4, 0xffffffff, ImDrawFlags_Closed, 1.f);
 
-                    _drag._hovered_active[1] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxb,
-                                                                    spr.second._region.y + spr.second._oyb}) <
-                                               pow2(8 / canvas._zoom);
-
-                    if (_drag._hovered_active[0] || _drag._hovered_active[1])
+                    if (IsMouseButtonPressed(0))
                     {
-                        clr = bgclr;
+                        _active_node = (int32_t)std::distance(_active_comp->_nodes.data(), active_node);
+                        _drag._drag_active[0] = true;
+                        _drag._drag_begin     = active_node->_position;
                     }
                 }
-    
-                if (spr.second._data == sprite_data::One)
-                {
-                    draw_origin(origin, clr);
-                }
-                if (spr.second._data == sprite_data::Two)
-                {
-                    draw_origin(origin, clr);
-                    draw_origin(origin2, clr);
-                    dc->AddLine(origin, origin2, clr);
-                }
-                if (spr.second._data == sprite_data::NinePatch)
-                {
-                    ImVec2 pp1 = local.transformPoint(p1 + ImVec2((float)spr.second._oxa, (float)spr.second._oya));
-                    ImVec2 pp2 = local.transformPoint(p1 + ImVec2((float)spr.second._oxb, (float)spr.second._oyb));
 
-                    dc->AddRect(pp1, pp2, clr);
-                    draw_origin(pp1, clr);
-                    draw_origin(pp2, clr);
+                if (IsMouseButtonDown(0) && _drag._drag_active[0])
+                {
+                    auto off                 = ImGui::GetMouseDragDelta(0);
+                    _active_comp->_nodes[_active_node]._position.x = (_drag._drag_begin.x + off.x / canvas._zoom);
+                    _active_comp->_nodes[_active_node]._position.y = (_drag._drag_begin.y + off.y / canvas._zoom);
                 }
-            }
+                else
+                {
+                    _drag._drag_active[0] = false;
+                }
 
-            if (_active == &spr.second && IsMouseButtonPressed(0))
-            {
-                if (_drag._hovered_active[0])
+                if (_drag_node._sprite)
                 {
-                    _drag._drag_active[0] = true;
-                    _drag._drag_origin = &spr.second;
-                    _drag._drag_begin  = {_drag._drag_origin->_oxa, _drag._drag_origin->_oya};
-                }
-                else if (_drag._hovered_active[1])
-                {
-                    _drag._drag_active[1] = true;
-                    _drag._drag_origin = &spr.second;
-                    _drag._drag_begin  = {_drag._drag_origin->_oxb, _drag._drag_origin->_oyb};
+                    _drag_node._position = local.inverseTransformPoint(GetMousePosition());
+                    draw_node(_drag_node, true);
+                    if (_drop_node)
+                    {
+                        _active_node = (int32_t)_active_comp->_nodes.size();
+                        _active_comp->_nodes.emplace_back(_drag_node);
+
+                        _drop_node = false;
+                        _drag_node._sprite = nullptr;
+                    }
                 }
             }
         }
+        else
+        {
+            dc->AddImage((ImTextureID)&_alpha_txt,
+                         local.transformPoint(ImVec2()),
+                         local.transformPoint(txtsize),
+                         {0, 0},
+                         {txtsize.x / 16.f, txtsize.y / 16.f},
+                         0x3fffffff);
+            dc->AddRect(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x5fffffff);
+
+            auto draw_origin = [dc](ImVec2 origin, uint32_t clr)
+            {
+                dc->AddLine(origin - ImVec2(0, 10), origin + ImVec2(0, 10), clr);
+                dc->AddLine(origin - ImVec2(10, 0), origin + ImVec2(10, 0), clr);
+                dc->AddRect(origin - ImVec2(3, 3), origin + ImVec2(4, 4), clr);
+            };
+
+            int index = 0;
+            for (auto& spr : _items)
+            {
+                ++index;
+                if (!spr.second._packed)
+                    continue;
+                bool isactive = _active == nullptr || _active == &spr.second;
+
+                const uint32_t al = isactive ? 0xffffffff : 0x5fffffff;
+                ImVec2         p1(spr.second._region.x, spr.second._region.y);
+                ImVec2 p2(spr.second._region.x + spr.second._region.width, spr.second._region.y + spr.second._region.height);
+                dc->AddImage((ImTextureID)&spr.second._txt, local.transformPoint(p1), local.transformPoint(p2), {0, 0}, {1, 1}, al);
+
+                auto clr = bgclr;
+
+                if (_mouse.x >= p1.x && _mouse.x < p2.x && _mouse.y >= p1.y && _mouse.y < p2.y)
+                {
+                    hover = true;
+                    clr   = flclr;
+                    if (IsMouseButtonPressed(0) && !_drag._hovered_active[0] && !_drag._hovered_active[1])
+                    {
+                        _active      = &spr.second;
+                        _active_name = spr.first;
+                    }
+                }
+
+                if (_visible_region || _active == &spr.second)
+                {
+                    dc->AddRect(local.transformPoint(p1), local.transformPoint(p2), clr);
+                }
+
+                if (_visible_index || _active == &spr.second)
+                {
+                    dc->AddText(local.transformPoint(p1) + ImVec2{2, 1}, clr, TextFormat("%d", index));
+                }
+
+                if (_visible_origin || _active == &spr.second)
+                {
+                    auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._oxa), float(spr.second._oya)});
+                    origin -= ImVec2(1, 1);
+                    auto origin2 = local.transformPoint(p1 + ImVec2{float(spr.second._oxb), float(spr.second._oyb)});
+                    origin2 -= ImVec2(1, 1);
+
+                    clr = flclr;
+                    if (_active == &spr.second)
+                    {
+                        _drag._hovered_active[0] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
+                                                                        spr.second._region.y + spr.second._oya}) <
+                                                   pow2(8 / canvas._zoom);
+
+                        _drag._hovered_active[1] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxb,
+                                                                        spr.second._region.y + spr.second._oyb}) <
+                                                   pow2(8 / canvas._zoom);
+
+                        if (_drag._hovered_active[0] || _drag._hovered_active[1])
+                        {
+                            clr = bgclr;
+                        }
+                    }
+
+                    if (spr.second._data == sprite_data::One)
+                    {
+                        draw_origin(origin, clr);
+                    }
+                    if (spr.second._data == sprite_data::Two)
+                    {
+                        draw_origin(origin, clr);
+                        draw_origin(origin2, clr);
+                        dc->AddLine(origin, origin2, clr);
+                    }
+                    if (spr.second._data == sprite_data::NinePatch)
+                    {
+                        ImVec2 pp1 = local.transformPoint(p1 + ImVec2((float)spr.second._oxa, (float)spr.second._oya));
+                        ImVec2 pp2 = local.transformPoint(p1 + ImVec2((float)spr.second._oxb, (float)spr.second._oyb));
+
+                        dc->AddRect(pp1, pp2, clr);
+                        draw_origin(pp1, clr);
+                        draw_origin(pp2, clr);
+                    }
+                }
+
+                if (_active == &spr.second && IsMouseButtonPressed(0))
+                {
+                    if (_drag._hovered_active[0])
+                    {
+                        _drag._drag_active[0] = true;
+                        _drag._drag_origin    = &spr.second;
+                        _drag._drag_begin     = {_drag._drag_origin->_oxa, _drag._drag_origin->_oya};
+                    }
+                    else if (_drag._hovered_active[1])
+                    {
+                        _drag._drag_active[1] = true;
+                        _drag._drag_origin    = &spr.second;
+                        _drag._drag_begin     = {_drag._drag_origin->_oxb, _drag._drag_origin->_oyb};
+                    }
+                }
+            }
+
+            if (IsMouseButtonDown(0) && (_drag._drag_active[0] || _drag._drag_active[1]))
+            {
+                auto off = ImGui::GetMouseDragDelta(0);
+                ImGui::BeginTooltip();
+                if (_drag._drag_active[0])
+                {
+                    _drag._drag_origin->_oxa = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
+                    _drag._drag_origin->_oya = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
+                    ImGui::Text("%d x %d", _drag._drag_origin->_oxa, _drag._drag_origin->_oya);
+                }
+                if (_drag._drag_active[1])
+                {
+                    _drag._drag_origin->_oxb = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
+                    _drag._drag_origin->_oyb = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
+                    ImGui::Text("%d x %d", _drag._drag_origin->_oxb, _drag._drag_origin->_oyb);
+                }
+                ImGui::EndTooltip();
+            }
+            else
+            {
+                _drag._drag_active[0] = false;
+                _drag._drag_active[1] = false;
+                _drag._drag_origin    = nullptr;
+            }
+        }
+
 
         if (!isnan(_mouse.x) && !isnan(_mouse.y) && ImGui::GetIO().MouseWheel)
         {
             canvas._zoom += ImGui::GetIO().MouseWheel * 0.1f;
             if (canvas._zoom < 0.1f)
                 canvas._zoom = 0.1f;
-            set_atlas_scale({canvas._zoom, canvas._zoom}, {_mouse.x, _mouse.y});
+            set_atlas_scale(canvas, {canvas._zoom, canvas._zoom}, {_mouse.x, _mouse.y});
         }
         else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0) && !_drag._drag_origin)
         {
             _active = nullptr;
         }
 
-        if (IsMouseButtonDown(0) && (_drag._drag_active[0] || _drag._drag_active[1]))
-        {
-            auto off = ImGui::GetMouseDragDelta(0);
-            ImGui::BeginTooltip();
-            if (_drag._drag_active[0])
-            {
-                _drag._drag_origin->_oxa = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
-                _drag._drag_origin->_oya = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
-                ImGui::Text("%d x %d", _drag._drag_origin->_oxa, _drag._drag_origin->_oya);
-            }
-            if (_drag._drag_active[1])
-            {
-                _drag._drag_origin->_oxb = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
-                _drag._drag_origin->_oyb = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
-                ImGui::Text("%d x %d", _drag._drag_origin->_oxb, _drag._drag_origin->_oyb);
-            }
-            ImGui::EndTooltip();
-        }
-        else
-        {
-            _drag._drag_active[0] = false;
-            _drag._drag_active[1] = false;
-            _drag._drag_origin = nullptr;
-        }
+
     }
 
     bool app::show_align(int32_t& x, int32_t& y, float w, float h) const
@@ -719,6 +903,7 @@ namespace box
         UnloadFileText(v);
 
         msg::Var items    = doc.get_item("items");
+        msg::Var composites = doc.get_item("composites");
         msg::Var texture  = doc.get_item("texture");
         msg::Var metadata = doc.get_item("metadata");
 
@@ -778,6 +963,23 @@ namespace box
             }
         }
 
+        for (auto& el : composites.elements())
+        {
+            auto& itm = _compositions[el.get_item("id").c_str()];
+
+            msg::Var items = el.get_item("items");
+            for (auto& nde : items.elements())
+            {
+                auto& node       = itm._nodes.emplace_back();
+                node._position.x = (float)nde.get_item("x").get_number(0.);
+                node._position.y = (float)nde.get_item("y").get_number(0.);
+                node._scale.x    = (float)nde.get_item("sx").get_number(1.);
+                node._scale.y    = (float)nde.get_item("sy").get_number(1.);
+                node._rotation   = (float)nde.get_item("r").get_number(0.);
+                node._sprite     = get_sprite(nde.get_item("s").str());
+            }
+        }
+
         _trimed_width += _spacing;
         _trimed_height += _spacing;
 
@@ -788,6 +990,7 @@ namespace box
     {
         msg::Var doc;
         msg::Var sprites;
+        msg::Var composites;
         msg::Var metadata;
         msg::Var texture;
 
@@ -848,6 +1051,29 @@ namespace box
             }
         }
 
+        for (auto& itm : _compositions)
+        {
+            msg::Var cmp;
+            cmp.set_item("id", std::string_view(itm.first));
+            composites.push_back(cmp);
+            msg::Var nodes;
+            for (auto& nde : itm.second._nodes)
+            {
+                msg::Var node;
+                node.set_item("x", nde._position.x);
+                node.set_item("y", nde._position.y);
+                if (nde._scale.x != 1.f)
+                    node.set_item("sx", nde._scale.x);
+                if (nde._scale.y != 1.f)
+                    node.set_item("sy", nde._scale.y);
+                if (nde._rotation)
+                    node.set_item("r", nde._rotation);
+                node.set_item("s", get_sprite_id(nde._sprite));
+                nodes.push_back(node);
+            }
+            cmp.set_item("items", nodes);
+        }
+
         auto r = false;
 
         if (_embed)
@@ -867,6 +1093,7 @@ namespace box
         }
 
         doc.set_item("items", sprites);
+        doc.set_item("composites", composites);
         doc.set_item("metadata", metadata);
         doc.set_item("texture", texture);
 
@@ -943,6 +1170,44 @@ namespace box
         return false;
     }
 
+    bool app::remove_composition_node(composition* spr, int32_t node)
+    {
+        if (!spr)
+            return false;
+        
+        if (size_t(node) >= spr->_nodes.size())
+            return false;
+
+        spr->_nodes.erase(spr->_nodes.begin() + node);
+        return true;
+    }
+
+    bool app::move_composition_node(composition* spr, int32_t& item, int dir)
+    {
+        if (!spr)
+            return false;
+
+        if (size_t(item) >= spr->_nodes.size())
+            return false;
+
+        // Compute the new index
+        int new_index = item + dir;
+
+        // Check bounds
+        if (new_index < 0 || new_index >= static_cast<int>(spr->_nodes.size()))
+        {
+            return false; // Out of bounds
+        }
+
+        // Perform the swap
+        std::swap(spr->_nodes[item], spr->_nodes[new_index]);
+
+        // Update the item's index
+        item = new_index;
+
+        return true;
+    }
+
     bool app::remove_file(sprite* spr)
     {
         if (!spr)
@@ -959,6 +1224,22 @@ namespace box
             }
         }
         return false;
+    }
+
+    std::string_view app::get_sprite_id(const sprite* spr) const
+    {
+        for (auto& el : _items)
+        {
+            if (&el.second == spr)
+                return el.first;
+        }
+        return std::string_view();
+    }
+
+    const sprite* app::get_sprite(std::string_view spr) const
+    {
+        auto it = _items.find(std::string(spr));
+        return _items.end() == it ? nullptr : &it->second;
     }
 
     bool app::repack()
@@ -1042,14 +1323,14 @@ namespace box
         _dirty     = true;
     }
 
-    void app::set_atlas_scale(const ImVec2& scale, const ImVec2& world_point)
+    void app::set_atlas_scale(canvas_data& canvas, const ImVec2& scale, const ImVec2& world_point)
     {
         matrix2d new_transform({0, 0}, {scale.x, scale.y}, {0, 0}, 0);
-        auto     s       = _atlas_canvas._transform.transformPoint(world_point);
+        auto     s               = canvas._transform.transformPoint(world_point);
         auto c = s - new_transform.transformPoint(world_point);
         new_transform.tx = c.x;
         new_transform.ty = c.y;
-        _atlas_canvas._transform = new_transform;
+        canvas._transform        = new_transform;
     }
 
     Image app::load_cb64(msg::Var ar) const
