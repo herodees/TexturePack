@@ -27,14 +27,40 @@ namespace box
 
     struct composition
     {
+        bool draw(size_t nde, ImDrawList* dc, matrix2d& tr);
+
         struct node
         {
             float         _rotation{0.f};
             point2f       _scale{1.f, 1.f};
             point2f       _position;
             const sprite* _sprite{};
+            bool          _selected{};
+
+            bool draw(ImDrawList* dc, matrix2d& tr, point2f mpos, const node* active_node) const;
         };
+
         std::vector<node> _nodes;
+        point2f           _grag_pos;
+        point2f           _mouse;
+        point2f           _center;
+        point2f           _rotation;
+        size_t            _active_node{size_t(-1)};
+        size_t            _hover_node{};
+        bool              _drag{};
+        bool              _rotate{};
+        bool              _selected{};
+
+        node*   get_active();
+        void    update_drag(ImDrawList* dc, matrix2d& local, float zoom);
+        size_t  node_index(const node* n) const;
+        void    select(size_t nde, bool ctrl);
+        void    select_all(float v);
+        void    move_selected(point2f offset);
+        void    rotate_selected(point2f center, float rotation);
+        void    scale_selected(point2f center, point2f scale);
+        point2f get_selected_center() const;
+        void    remove_sprite(sprite* spr);
     };
 
     struct drag_data
@@ -79,8 +105,8 @@ namespace box
         bool add_files();
         bool add_composition(const char* path);
         bool remove_composition(composition* spr);
-        bool remove_composition_node(composition* spr, int32_t node);
-        bool move_composition_node(composition* spr, int32_t& node, int dir);
+        bool remove_composition_node(composition* spr, size_t node);
+        bool move_composition_node(composition* spr, size_t& node, int dir);
         bool remove_file(sprite* spr);
         std::string_view get_sprite_id(const sprite* spr) const;
         const sprite* get_sprite(std::string_view spr) const;
@@ -96,7 +122,6 @@ namespace box
         std::map<std::string, composition> _compositions;
         sprite*                       _active{};
         composition*                  _active_comp{};
-        int32_t                       _active_node{-1};
         composition::node             _drag_node{};
         drag_data                     _drag{};
         std::string                   _active_name;

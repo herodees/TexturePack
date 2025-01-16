@@ -113,7 +113,8 @@ namespace box
 
             bool visible = true;
 
-            if (_active_comp && (size_t)_active_node < _active_comp->_nodes.size() &&
+            if (_active_comp &&
+                _active_comp->get_active() &&
                 ImGui::CollapsingHeader("Node", &visible, ImGuiTreeNodeFlags_DefaultOpen))
             {
                 show_node_properties();
@@ -121,7 +122,7 @@ namespace box
 
             if (!visible)
             {
-                remove_composition_node(_active_comp, _active_node);
+                remove_composition_node(_active_comp, _active_comp->_active_node);
             }
 
         }
@@ -249,7 +250,7 @@ namespace box
 
     void app::show_node_properties()
     {
-        auto& node = _active_comp->_nodes[_active_node];
+        auto& node = *_active_comp->get_active();
 
         if (ImGui::BeginTable("##ndeprop",
                               2,
@@ -277,13 +278,13 @@ namespace box
             ImGui::AlignTextToFramePadding();
             if (ImGui::Button("Up", {-1, 0}))
             {
-                move_composition_node(_active_comp, _active_node, 1);
+                move_composition_node(_active_comp, _active_comp->_active_node, 1);
             }
             ImGui::TableSetColumnIndex(1);
             ImGui::SetNextItemWidth(-FLT_MIN);
             if (ImGui::Button("Down", {-1, 0}))
             {
-                move_composition_node(_active_comp, _active_node, -1);
+                move_composition_node(_active_comp, _active_comp->_active_node, -1);
             }
             ImGui::EndTable();
         }
@@ -592,93 +593,17 @@ namespace box
 
             if (_active_comp)
             {
-                composition::node* active_node = nullptr;
-                ImVec2 active_node_pos[4];
-
-                auto draw_node = [&](composition::node& el, bool lines)
-                {
-                        bool active = _active_node == (int32_t)std::distance(_active_comp->_nodes.data(), &el);
-
-                        matrix2d tr(el._position, el._scale, point2f{el._sprite->_oxa, el._sprite->_oya}, el._rotation);
-                        auto     lpos = tr.inverseTransformPoint(_mouse);
-                        tr = local * tr;
-
-                        if (lpos.x >= 0 &&
-                            lpos.y >= 0 &&
-                            lpos.x < el._sprite->_region.width &&
-                            lpos.y < el._sprite->_region.height)
-                        {
-                            active_node = &el;
-                        }
-
-                        dc->PushTextureID((ImTextureID)&el._sprite->_txt);
-                        dc->PrimReserve(6, 4);
-
-                        ImVec2 pos[4];
-                        pos[0] = tr.transformPoint(ImVec2{0, 0});
-                        pos[1] = tr.transformPoint(ImVec2{0, el._sprite->_region.height});
-                        pos[2] = tr.transformPoint(ImVec2{el._sprite->_region.width, el._sprite->_region.height});
-                        pos[3] = tr.transformPoint(ImVec2{el._sprite->_region.width, 0});
-
-                        if (active_node == &el)
-                        {
-                            active_node_pos[0] = pos[0];
-                            active_node_pos[1] = pos[1];
-                            active_node_pos[2] = pos[2];
-                            active_node_pos[3] = pos[3];
-                        }
-
-                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx));
-                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 1));
-                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 2));
-                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx));
-                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 2));
-                        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 3));
-                        dc->PrimWriteVtx(pos[0], {0.f, 0.f}, 0xffffffff);
-                        dc->PrimWriteVtx(pos[1], {0.f, 1.f}, 0xffffffff);
-                        dc->PrimWriteVtx(pos[2], {1.f, 1.f}, 0xffffffff);
-                        dc->PrimWriteVtx(pos[3], {1.f, 0.f}, 0xffffffff);
-                        dc->PopTextureID();
-
-                        dc->AddPolyline(pos, 4, active ? 0xffffffff : 0x5fffffff, ImDrawFlags_Closed, 1.f);
-                    };
-
-                for (auto& el : _active_comp->_nodes)
-                {
-                    if (el._sprite)
-                        draw_node(el, false);
-                }
-
-                if (active_node)
-                {
-                    dc->AddPolyline(active_node_pos, 4, 0xffffffff, ImDrawFlags_Closed, 1.f);
-
-                    if (IsMouseButtonPressed(0))
-                    {
-                        _active_node = (int32_t)std::distance(_active_comp->_nodes.data(), active_node);
-                        _drag._drag_active[0] = true;
-                        _drag._drag_begin     = active_node->_position;
-                    }
-                }
-
-                if (IsMouseButtonDown(0) && _drag._drag_active[0])
-                {
-                    auto off                 = ImGui::GetMouseDragDelta(0);
-                    _active_comp->_nodes[_active_node]._position.x = (_drag._drag_begin.x + off.x / canvas._zoom);
-                    _active_comp->_nodes[_active_node]._position.y = (_drag._drag_begin.y + off.y / canvas._zoom);
-                }
-                else
-                {
-                    _drag._drag_active[0] = false;
-                }
+                _active_comp->_mouse = _mouse;
+                _active_comp->update_drag(dc, local, canvas._zoom);
 
                 if (_drag_node._sprite)
                 {
                     _drag_node._position = local.inverseTransformPoint(GetMousePosition());
-                    draw_node(_drag_node, true);
+                    _drag_node.draw(dc, local, _mouse, &_drag_node);
+
                     if (_drop_node)
                     {
-                        _active_node = (int32_t)_active_comp->_nodes.size();
+                        _active_comp->_active_node = (int32_t)_active_comp->_nodes.size();
                         _active_comp->_nodes.emplace_back(_drag_node);
 
                         _drop_node = false;
@@ -1170,7 +1095,7 @@ namespace box
         return false;
     }
 
-    bool app::remove_composition_node(composition* spr, int32_t node)
+    bool app::remove_composition_node(composition* spr, size_t node)
     {
         if (!spr)
             return false;
@@ -1182,7 +1107,7 @@ namespace box
         return true;
     }
 
-    bool app::move_composition_node(composition* spr, int32_t& item, int dir)
+    bool app::move_composition_node(composition* spr, size_t& item, int dir)
     {
         if (!spr)
             return false;
@@ -1191,7 +1116,7 @@ namespace box
             return false;
 
         // Compute the new index
-        int new_index = item + dir;
+        int new_index = int(item) + dir;
 
         // Check bounds
         if (new_index < 0 || new_index >= static_cast<int>(spr->_nodes.size()))
@@ -1369,5 +1294,257 @@ namespace box
         return out;
     }
 
+
+    bool composition::draw(size_t nde, ImDrawList* dc, matrix2d& tr)
+    {
+        if (nde >= _nodes.size())
+            return false;
+
+        return _nodes[nde].draw(dc, tr, _mouse, get_active());
+    }
+
+    composition::node* composition::get_active()
+    {
+        if (_active_node >= _nodes.size())
+            return nullptr;
+        return &_nodes[_active_node];
+    }
+
+    void composition::update_drag(ImDrawList* dc, matrix2d& local, float zoom)
+    {
+        size_t hover_node = -1;
+        bool   rotation_hover = false;
+
+        for (size_t n = 0; n < _nodes.size(); ++n)
+        {
+            if (draw(n, dc, local))
+                hover_node = n;
+        }
+
+        if (_selected)
+        {
+            ImVec2 c       = local.transformPoint(ImVec2(_center.x, _center.y));
+            auto   dst     = (_mouse - _center).distance_sqr();
+            rotation_hover = dst < std::pow(90 / zoom, 2) && dst > std::pow(70 / zoom, 2); 
+
+            dc->AddCircle(c, 5, 0x7fffffff);
+            dc->AddCircle(c, 80, rotation_hover ? 0xff00ffff : 0x7fffffff);
+        }
+
+        if (!IsMouseButtonDown(0))
+        {
+            _drag = false;
+            _rotate = false;
+        }
+
+        if (IsKeyPressed('A') && ImGui::GetIO().KeyCtrl)
+        {
+            select_all(true);
+        }
+
+        if (IsMouseButtonPressed(0))
+        {
+            if (rotation_hover)
+            {
+                _rotate   = true;
+                _grag_pos = _mouse;
+            }
+            else if (hover_node != -1)
+            {
+                if(_nodes[hover_node]._selected)
+                {
+                    _drag     = true;
+                    _grag_pos = _mouse;
+                }
+                else
+                {
+                    select(hover_node, ImGui::GetIO().KeyCtrl);
+                }
+            }
+            else
+            {
+                select_all(false);
+            }
+        }
+        _hover_node = hover_node;
+
+        if (_drag)
+        {
+            auto offset = _mouse - _grag_pos;
+            move_selected(offset);
+            _grag_pos = _mouse;
+        }
+
+        if (_rotate && !std::isnan(_mouse.x))
+        {
+            auto a = _grag_pos - _center;
+            auto b = _mouse - _center;
+            float rot = (b.angle() - a.angle());
+            rotate_selected(_center, rot * (180.0f / M_PI));
+            _grag_pos = _mouse;
+        }
+    }
+
+    size_t composition::node_index(const node* n) const
+    {
+        return std::distance(_nodes.data(), n);
+    }
+
+    void composition::select(size_t nde, bool ctrl)
+    {
+        if (!ctrl)
+        {
+            select_all(false);
+        }
+
+        _active_node = nde;
+
+        if (nde >= _nodes.size())
+            return;
+
+        _nodes[nde]._selected = true;
+        _selected             = true;
+        _center               = get_selected_center();
+    }
+
+    void composition::select_all(float v)
+    {
+        _active_node = _nodes.size() - 1;
+        for (auto& n : _nodes)
+        {
+            n._selected = v;
+        }
+        if (!v)
+            _active_node = -1;
+        else
+            _center = get_selected_center();
+        _selected = v;
+    }
+
+    void composition::move_selected(point2f offset)
+    {
+        for (auto& n : _nodes)
+        {
+            if (n._selected)
+            {
+                n._position += offset;
+            }
+        }
+        _center = get_selected_center();
+    }
+
+    point2f composition::get_selected_center() const
+    {
+        point2f center         = {0.f, 0.f};
+        int     selected_count = 0;
+
+        for (const auto& n : _nodes)
+        {
+            if (n._selected)
+            {
+                center.x += n._position.x;
+                center.y += n._position.y;
+                ++selected_count;
+            }
+        }
+
+        if (selected_count > 0)
+        {
+            center.x /= selected_count;
+            center.y /= selected_count;
+        }
+
+        return center;
+    }
+
+    void composition::rotate_selected(point2f center, float rotation)
+    {
+        const auto radians   = rotation * (M_PI / 180.0f);
+        const auto cos_theta = std::cos(radians);
+        const auto sin_theta = std::sin(radians);
+
+        for (auto& n : _nodes)
+        {
+            if (n._selected)
+            {
+                auto relative_pos = n._position - center;
+                n._rotation += rotation;
+                n._position          = point2f{relative_pos.x * cos_theta - relative_pos.y * sin_theta,
+                                      relative_pos.x * sin_theta + relative_pos.y * cos_theta} + center;
+
+                if (n._rotation >= 360.0f)
+                    n._rotation -= 360.0f;
+                else if (n._rotation < 0.0f)
+                    n._rotation += 360.0f;
+            }
+        }
+    }
+
+    void composition::scale_selected(point2f center, point2f scale)
+    {
+        for (auto& n : _nodes)
+        {
+            if (n._selected)
+            {
+                n._position.x = center.x + (n._position.x - center.x) * scale.x;
+                n._position.y = center.y + (n._position.y - center.y) * scale.y;
+                n._scale.x *= scale.x;
+                n._scale.y *= scale.y;
+            }
+        }
+    }
+
+    void composition::remove_sprite(sprite* spr)
+    {
+        for (auto& n : _nodes)
+        {
+            if (n._sprite == spr)
+                n._sprite = nullptr;
+        }
+    }
+
+    bool composition::node::draw(ImDrawList* dc, matrix2d& local, point2f mpos, const node* active_node) const
+    {
+        bool hovered = false;
+
+        if (!_sprite)
+            return hovered;
+
+        matrix2d tr(_position, _scale, point2f{_sprite->_oxa, _sprite->_oya}, _rotation);
+        auto     lpos = tr.inverseTransformPoint(mpos);
+        tr            = local * tr;
+
+        if (lpos.x >= 0 && lpos.y >= 0 && lpos.x < _sprite->_region.width && lpos.y < _sprite->_region.height)
+        {
+            hovered = true;
+        }
+
+        dc->PushTextureID((ImTextureID)&_sprite->_txt);
+
+        ImVec2 pos[4];
+        pos[0] = tr.transformPoint(ImVec2{0, 0});
+        pos[1] = tr.transformPoint(ImVec2{0, _sprite->_region.height});
+        pos[2] = tr.transformPoint(ImVec2{_sprite->_region.width, _sprite->_region.height});
+        pos[3] = tr.transformPoint(ImVec2{_sprite->_region.width, 0});
+
+        dc->PrimReserve(6, 4);
+        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx));
+        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 1));
+        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 2));
+        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx));
+        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 2));
+        dc->PrimWriteIdx((ImDrawIdx)(dc->_VtxCurrentIdx + 3));
+
+        dc->PrimWriteVtx(pos[0], {0.f, 0.f}, 0xffffffff);
+        dc->PrimWriteVtx(pos[1], {0.f, 1.f}, 0xffffffff);
+        dc->PrimWriteVtx(pos[2], {1.f, 1.f}, 0xffffffff);
+        dc->PrimWriteVtx(pos[3], {1.f, 0.f}, 0xffffffff);
+
+        dc->PopTextureID();
+
+        dc->AddPolyline(pos, 4, active_node == this || _selected ? 0xffffffff : 0x5fffffff, ImDrawFlags_Closed, 1.f);
+
+        return hovered;
+    }
 
 } // namespace box
