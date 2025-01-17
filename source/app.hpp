@@ -61,6 +61,8 @@ namespace box
         void    scale_selected(point2f center, point2f scale);
         point2f get_selected_center() const;
         void    remove_sprite(sprite* spr);
+        bool    remove_node(size_t n);
+        bool    reorder_node(size_t n, int32_t dir);
     };
 
     struct drag_data
@@ -105,8 +107,6 @@ namespace box
         bool add_files();
         bool add_composition(const char* path);
         bool remove_composition(composition* spr);
-        bool remove_composition_node(composition* spr, size_t node);
-        bool move_composition_node(composition* spr, size_t& node, int dir);
         bool remove_file(sprite* spr);
         std::string_view get_sprite_id(const sprite* spr) const;
         const sprite* get_sprite(std::string_view spr) const;

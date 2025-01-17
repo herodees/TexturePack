@@ -120,9 +120,9 @@ namespace box
                 show_node_properties();
             }
 
-            if (!visible)
+            if (!visible && _active_comp)
             {
-                remove_composition_node(_active_comp, _active_comp->_active_node);
+                _active_comp->remove_node(_active_comp->_active_node);
             }
 
         }
@@ -278,13 +278,13 @@ namespace box
             ImGui::AlignTextToFramePadding();
             if (ImGui::Button("Up", {-1, 0}))
             {
-                move_composition_node(_active_comp, _active_comp->_active_node, 1);
+                _active_comp->reorder_node(_active_comp->_active_node, 1);
             }
             ImGui::TableSetColumnIndex(1);
             ImGui::SetNextItemWidth(-FLT_MIN);
             if (ImGui::Button("Down", {-1, 0}))
             {
-                move_composition_node(_active_comp, _active_comp->_active_node, -1);
+                _active_comp->reorder_node(_active_comp->_active_node, -1);
             }
             ImGui::EndTable();
         }
@@ -441,9 +441,7 @@ namespace box
 
         if (ImGui::Button(ICON_FA_FOLDER_PLUS))
         {
-            std::string name("comp_");
-            name += std::to_string(rand());
-            add_composition(name.c_str());
+            add_composition("composite");
             _dirty = true;
         }
         ImGui::SameLine();
@@ -1073,7 +1071,17 @@ namespace box
 
     bool app::add_composition(const char* path)
     {
-        auto& comp = _compositions[path];
+        std::string candidate_name = path;
+        int         suffix         = 1;
+
+        // Check for duplicates
+        while (_compositions.find(candidate_name) != _compositions.end())
+        {
+            candidate_name = path;
+            candidate_name += "_" + std::to_string(suffix++);
+        }
+
+        auto& comp = _compositions[candidate_name];
         return true;
     }
 
@@ -1093,44 +1101,6 @@ namespace box
             }
         }
         return false;
-    }
-
-    bool app::remove_composition_node(composition* spr, size_t node)
-    {
-        if (!spr)
-            return false;
-        
-        if (size_t(node) >= spr->_nodes.size())
-            return false;
-
-        spr->_nodes.erase(spr->_nodes.begin() + node);
-        return true;
-    }
-
-    bool app::move_composition_node(composition* spr, size_t& item, int dir)
-    {
-        if (!spr)
-            return false;
-
-        if (size_t(item) >= spr->_nodes.size())
-            return false;
-
-        // Compute the new index
-        int new_index = int(item) + dir;
-
-        // Check bounds
-        if (new_index < 0 || new_index >= static_cast<int>(spr->_nodes.size()))
-        {
-            return false; // Out of bounds
-        }
-
-        // Perform the swap
-        std::swap(spr->_nodes[item], spr->_nodes[new_index]);
-
-        // Update the item's index
-        item = new_index;
-
-        return true;
     }
 
     bool app::remove_file(sprite* spr)
@@ -1337,12 +1307,49 @@ namespace box
             _rotate = false;
         }
 
+        if (ImGui::BeginPopup("Options"))
+        {
+            if (ImGui::MenuItem("Bring to Front"))
+            {
+                reorder_node(_active_node, 10000);
+            }
+            if (ImGui::MenuItem("Move up"))
+            {
+                reorder_node(_active_node, 1);
+            }
+            if (ImGui::MenuItem("Move down"))
+            {
+                reorder_node(_active_node, -1);
+            }
+            if (ImGui::MenuItem("Bring to Back"))
+            {
+                reorder_node(_active_node, -10000);
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Delete"))
+            {
+                remove_node(_active_node);
+            }
+            ImGui::EndPopup();
+
+            return;
+        }
+
         if (IsKeyPressed('A') && ImGui::GetIO().KeyCtrl)
         {
             select_all(true);
         }
 
-        if (IsMouseButtonPressed(0))
+        if (IsMouseButtonPressed(1) && !std::isnan(_mouse.x))
+        {
+            if (hover_node != -1)
+            {
+                select(hover_node, ImGui::GetIO().KeyCtrl);
+                ImGui::OpenPopup("Options");
+            }
+        }
+
+        if (IsMouseButtonPressed(0) && !std::isnan(_mouse.x))
         {
             if (rotation_hover)
             {
@@ -1501,6 +1508,49 @@ namespace box
             if (n._sprite == spr)
                 n._sprite = nullptr;
         }
+    }
+
+    bool composition::remove_node(size_t n)
+    {
+        if (n >= _nodes.size())
+            return false;
+
+        _nodes.erase(_nodes.begin() + n);
+        select_all(false);
+        return true;
+    }
+
+    bool composition::reorder_node(size_t n, int32_t dir)
+    {
+        if (_nodes.empty() || n >= _nodes.size())
+        {
+            return false;
+        }
+
+        bool reselect = _active_node == n;
+        int32_t new_pos = static_cast<int32_t>(n) + dir;
+        new_pos = std::max(0, std::min(static_cast<int32_t>(_nodes.size() - 1), new_pos));
+
+        if (new_pos == static_cast<int32_t>(n))
+        {
+            return true;
+        }
+
+        if (new_pos < static_cast<int32_t>(n))
+        {
+            std::rotate(_nodes.begin() + new_pos, _nodes.begin() + n, _nodes.begin() + n + 1);
+        }
+        else
+        {
+            std::rotate(_nodes.begin() + n, _nodes.begin() + n + 1, _nodes.begin() + new_pos + 1);
+        }
+
+        if (reselect)
+        {
+            _active_node = new_pos;
+            _center      = get_selected_center();
+        }
+        return true;
     }
 
     bool composition::node::draw(ImDrawList* dc, matrix2d& local, point2f mpos, const node* active_node) const
