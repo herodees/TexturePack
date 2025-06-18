@@ -5,6 +5,9 @@
 void ShowDock(box::app&);
 void InitTheme(bool dark_theme);
 bool EnableDarkTheme(size_t wnd);
+void AppSettingsHandler();
+
+static box::properties_t g_props{};
 
 int  main(int argc, char* argv[])
 {
@@ -15,13 +18,15 @@ int  main(int argc, char* argv[])
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "BOX TexturePacker");
+
     SetTargetFPS(144);
     rlImGuiSetup(true);
     InitTheme(true);
 
+
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    box::app _app;
+    box::app _app(g_props);
 
     if (argc > 1)
         _app.open_atlas(argv[1]);
@@ -43,6 +48,7 @@ int  main(int argc, char* argv[])
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
+    ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
     rlImGuiShutdown();
 
     // De-Initialization
@@ -109,13 +115,72 @@ void ShowDock(box::app& application)
     ImGui::PopStyleVar();
 }
 
+namespace History
+{
+    void ClearAll(ImGuiContext* ctx, ImGuiSettingsHandler*)
+    {
+    }
+
+    void ApplyAll(ImGuiContext* ctx, ImGuiSettingsHandler*)
+    {
+    }
+
+    void* ReadOpen(ImGuiContext*, ImGuiSettingsHandler* handler, const char* name)
+    {
+        if (strcmp(name, "Files"))
+            return nullptr;
+
+        return handler->UserData;
+    }
+
+    void ReadLine(ImGuiContext*, ImGuiSettingsHandler* handler, void* entry, const char* line)
+    {
+        auto* prop = (box::properties_t*)handler->UserData;
+        int d        = 0;
+        if (sscanf_s(line, "P%d=", &d) == 1)
+        {
+            if (d < prop->paths.size())
+                prop->paths[d] = strchr(line, '=') + 1;
+            return;
+        }
+    }
+
+    void WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf)
+    {
+        buf->appendf("\n[%s][Files]\n", handler->TypeName);
+        auto* prop = (box::properties_t*)handler->UserData;
+        for (int32_t i = 0; i < int32_t(prop->paths.size()); i++)
+        {
+            buf->appendf("P%d=%s\n", i, prop->paths[i].c_str());
+        }
+    }
+}
+
+void AppSettingsHandler()
+{
+    if (auto* ctx = ImGui::GetCurrentContext())
+    {
+        ImGuiSettingsHandler ini_handler;
+        ini_handler.TypeName   = "Box";
+        ini_handler.TypeHash   = ImHashStr("Box");
+        ini_handler.ClearAllFn = History::ClearAll;
+        ini_handler.ReadOpenFn = History::ReadOpen;
+        ini_handler.ReadLineFn = History::ReadLine;
+        ini_handler.ApplyAllFn = History::ApplyAll;
+        ini_handler.WriteAllFn = History::WriteAll;
+        ini_handler.UserData   = &g_props;
+        ctx->SettingsHandlers.push_back(ini_handler);
+    }
+}
+
 void InitTheme(bool dark_theme)
 {
     rlImGuiSetup(dark_theme);
 
     EnableDarkTheme((size_t)GetWindowHandle());
 
-    ImGui::GetIO().IniFilename = nullptr;
+    ImGui::GetIO().IniFilename = "config.ini";
+    AppSettingsHandler();
 
     // Cherry style from ImThemes
     ImGuiStyle& style = ImGui::GetStyle();

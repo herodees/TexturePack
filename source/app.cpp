@@ -2,7 +2,7 @@
 
 namespace box
 {
-    app::app()
+    app::app(properties_t& props) : _props(props)
     {
         auto img = GenImageColor(2, 2, WHITE);
         ImageDrawPixel(&img, 0, 0, BLACK);
@@ -65,6 +65,19 @@ namespace box
                         open_atlas(file);
                     }
                 }
+                if (ImGui::BeginMenu("Recent"))
+                {
+                    for (auto& pth : _props.paths)
+                    {
+                        if (pth.empty())
+                            continue;
+                        if (ImGui::MenuItem(pth.c_str()))
+                            open_atlas(pth.c_str());
+
+                    }
+                    ImGui::EndMenu();
+                }
+
                 if (ImGui::MenuItem("Save"))
                 {
                     if (_path.empty())
@@ -501,25 +514,19 @@ namespace box
 
             auto& canvas = _composite_mode ? _comp_canvas : _atlas_canvas;
 
-            ImGui::SetNextItemWidth(200);
-            if (ImGui::SliderFloat("##zm", &canvas._zoom, 0.1f, 5.f))
+            if (ImGui::Button(TextFormat("%.0f%%", canvas.zoom * 100), {100, 0}))
             {
-                set_atlas_scale(canvas, {canvas._zoom, canvas._zoom}, {0, 0});
+                canvas.zoom = 1.f;
             }
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_EXPAND))
             {
-                canvas._zoom = 1.f;
-                canvas._transform.reset();
+                canvas.FitToScreen(get_texture_size());
             }
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_COMPRESS))
             {
-                canvas._zoom = canvas._ideal_zoom;
-                canvas._transform.reset();
-                canvas._transform.scale(canvas._zoom, canvas._zoom);
-                canvas._transform.tx = canvas._ideal_offset.x;
-                canvas._transform.ty = canvas._ideal_offset.y;
+                canvas.CenterOnScreen(get_texture_size());
             }
 
             ImGui::SameLine();
@@ -532,11 +539,7 @@ namespace box
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0);
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
 
-            if (ImGui::BeginChild(10, {-1, -1}, 0, ImGuiWindowFlags_NoScrollWithMouse))
-            {
-                show_canvas(canvas);
-            }
-            ImGui::EndChild();
+            show_canvas(canvas);
 
             if (_drop_node)
             {
@@ -559,40 +562,35 @@ namespace box
         ImGui::End();
     }
 
-    void app::show_canvas(canvas_data& canvas)
+    void app::show_canvas(ImGui::CanvasParams& canvas)
     {
-        ImVec2 txtsize(!_trim ? (float)_width : (float)_trimed_width, !_trim ? (float)_height : (float)_trimed_height);
-        ImVec2 from = ImGui::GetWindowPos();
-        ImVec2 size = ImGui::GetContentRegionAvail();
+        if (!ImGui::BeginCanvas("canvas", {-1, -1}, canvas))
+            return;
 
-        matrix2d local({from.x, from.y}, {1.f, 1.f}, {(size.x - txtsize.x) / -2, (size.y - txtsize.y) / -2}, 0);
-
-        auto iz         = size / txtsize;
-        canvas._ideal_zoom = iz.x < iz.y ? iz.x : iz.y;
-        canvas._ideal_offset.x = (size.x - txtsize.x) / -2;
-        canvas._ideal_offset.y = (size.y - txtsize.y) / -2;
-
-        local = local * canvas._transform;
-        if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows))
-            _mouse = {NAN, NAN};
-        else
-            _mouse = local.inverseTransformPoint(GetMousePosition());
-
-        auto flclr = ImGui::GetColorU32(ImGuiCol_DragDropTarget);
-        auto bgclr = ImGui::GetColorU32(ImGuiCol_NavHighlight);
-        auto dc    = ImGui::GetWindowDrawList();
-        bool hover = false;
-        dc->Flags  = ImDrawListFlags_None;
+        ImVec2 txtsize(get_texture_size());
+        auto   flclr = ImGui::GetColorU32(ImGuiCol_DragDropTarget);
+        auto   bgclr = ImGui::GetColorU32(ImGuiCol_NavHighlight);
+        auto   dc    = ImGui::GetWindowDrawList();
+        auto   mouse = canvas.ScreenToWorld(ImGui::GetIO().MousePos);
+        bool   hover = false;
+        _mouse       = {mouse.x, mouse.y};
 
         if (_composite_mode)
         {
-            dc->AddLine(local.transformPoint(ImVec2(0, -10000)), local.transformPoint(ImVec2(0, 10000)), 0xff0000ff);
-            dc->AddLine(local.transformPoint(ImVec2(-10000,0)), local.transformPoint(ImVec2(10000,0)), 0xff00ff00);
+            if (_reset_comp_canvas && canvas.canvas_size.x > 0)
+            {
+                canvas.CenterOnScreen();
+                _reset_comp_canvas = false;
+            }
+            ImGui::DrawGrid(canvas);
+            ImGui::DrawOrigin(canvas, -1);
 
             if (_active_comp)
             {
+                matrix2d local = matrix2d({canvas.canvas_pos.x, canvas.canvas_pos.y}, {1.f, 1.f}, {}, 0) *
+                                 matrix2d({canvas.origin.x, canvas.origin.y}, {canvas.zoom, canvas.zoom}, {}, 0);
                 _active_comp->_mouse = _mouse;
-                _active_comp->update_drag(dc, local, canvas._zoom);
+                _active_comp->update_drag(dc, local, canvas.zoom);
 
                 if (_drag_node._sprite)
                 {
@@ -612,13 +610,20 @@ namespace box
         }
         else
         {
+            if (_reset_atlas_canvas && canvas.canvas_size.x > 0)
+            {
+                canvas.CenterOnScreen(get_texture_size());
+                _reset_atlas_canvas = false;
+            }
+
             dc->AddImage((ImTextureID)&_alpha_txt,
-                         local.transformPoint(ImVec2()),
-                         local.transformPoint(txtsize),
-                         {0, 0},
-                         {txtsize.x / 16.f, txtsize.y / 16.f},
-                         0x3fffffff);
-            dc->AddRect(local.transformPoint(ImVec2()), local.transformPoint(txtsize), 0x5fffffff);
+                         canvas.WorldToScreen(ImVec2()),
+                         canvas.WorldToScreen(txtsize),
+                         {},
+                         {(txtsize.x / _alpha_txt.width / (16 / canvas.zoom)) / canvas.zoom,
+                          (txtsize.y / _alpha_txt.height / (16 / canvas.zoom)) / canvas.zoom}, 0x5fffffff);
+
+            dc->AddRect(canvas.WorldToScreen(ImVec2()), canvas.WorldToScreen(txtsize), 0x5fffffff);
 
             auto draw_origin = [dc](ImVec2 origin, uint32_t clr)
             {
@@ -638,7 +643,7 @@ namespace box
                 const uint32_t al = isactive ? 0xffffffff : 0x5fffffff;
                 ImVec2         p1(spr.second._region.x, spr.second._region.y);
                 ImVec2 p2(spr.second._region.x + spr.second._region.width, spr.second._region.y + spr.second._region.height);
-                dc->AddImage((ImTextureID)&spr.second._txt, local.transformPoint(p1), local.transformPoint(p2), {0, 0}, {1, 1}, al);
+                dc->AddImage((ImTextureID)&spr.second._txt, canvas.WorldToScreen(p1), canvas.WorldToScreen(p2), {0, 0}, {1, 1}, al);
 
                 auto clr = bgclr;
 
@@ -655,19 +660,19 @@ namespace box
 
                 if (_visible_region || _active == &spr.second)
                 {
-                    dc->AddRect(local.transformPoint(p1), local.transformPoint(p2), clr);
+                    dc->AddRect(canvas.WorldToScreen(p1), canvas.WorldToScreen(p2), clr);
                 }
 
                 if (_visible_index || _active == &spr.second)
                 {
-                    dc->AddText(local.transformPoint(p1) + ImVec2{2, 1}, clr, TextFormat("%d", index));
+                    dc->AddText(canvas.WorldToScreen(p1) + ImVec2{2, 1}, clr, TextFormat("%d", index));
                 }
 
                 if (_visible_origin || _active == &spr.second)
                 {
-                    auto origin = local.transformPoint(p1 + ImVec2{float(spr.second._oxa), float(spr.second._oya)});
+                    auto origin = canvas.WorldToScreen(p1 + ImVec2{float(spr.second._oxa), float(spr.second._oya)});
                     origin -= ImVec2(1, 1);
-                    auto origin2 = local.transformPoint(p1 + ImVec2{float(spr.second._oxb), float(spr.second._oyb)});
+                    auto origin2 = canvas.WorldToScreen(p1 + ImVec2{float(spr.second._oxb), float(spr.second._oyb)});
                     origin2 -= ImVec2(1, 1);
 
                     clr = flclr;
@@ -675,11 +680,11 @@ namespace box
                     {
                         _drag._hovered_active[0] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxa,
                                                                         spr.second._region.y + spr.second._oya}) <
-                                                   pow2(8 / canvas._zoom);
+                                                   pow2(8 / canvas.zoom);
 
                         _drag._hovered_active[1] = _mouse.distance_sqr({spr.second._region.x + spr.second._oxb,
                                                                         spr.second._region.y + spr.second._oyb}) <
-                                                   pow2(8 / canvas._zoom);
+                                                   pow2(8 / canvas.zoom);
 
                         if (_drag._hovered_active[0] || _drag._hovered_active[1])
                         {
@@ -699,8 +704,8 @@ namespace box
                     }
                     if (spr.second._data == sprite_data::NinePatch)
                     {
-                        ImVec2 pp1 = local.transformPoint(p1 + ImVec2((float)spr.second._oxa, (float)spr.second._oya));
-                        ImVec2 pp2 = local.transformPoint(p1 + ImVec2((float)spr.second._oxb, (float)spr.second._oyb));
+                        ImVec2 pp1 = canvas.WorldToScreen(p1 + ImVec2((float)spr.second._oxa, (float)spr.second._oya));
+                        ImVec2 pp2 = canvas.WorldToScreen(p1 + ImVec2((float)spr.second._oxb, (float)spr.second._oyb));
 
                         dc->AddRect(pp1, pp2, clr);
                         draw_origin(pp1, clr);
@@ -731,14 +736,14 @@ namespace box
                 ImGui::BeginTooltip();
                 if (_drag._drag_active[0])
                 {
-                    _drag._drag_origin->_oxa = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
-                    _drag._drag_origin->_oya = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
+                    _drag._drag_origin->_oxa = int32_t(_drag._drag_begin.x + off.x / canvas.zoom);
+                    _drag._drag_origin->_oya = int32_t(_drag._drag_begin.y + off.y / canvas.zoom);
                     ImGui::Text("%d x %d", _drag._drag_origin->_oxa, _drag._drag_origin->_oya);
                 }
                 if (_drag._drag_active[1])
                 {
-                    _drag._drag_origin->_oxb = int32_t(_drag._drag_begin.x + off.x / canvas._zoom);
-                    _drag._drag_origin->_oyb = int32_t(_drag._drag_begin.y + off.y / canvas._zoom);
+                    _drag._drag_origin->_oxb = int32_t(_drag._drag_begin.x + off.x / canvas.zoom);
+                    _drag._drag_origin->_oyb = int32_t(_drag._drag_begin.y + off.y / canvas.zoom);
                     ImGui::Text("%d x %d", _drag._drag_origin->_oxb, _drag._drag_origin->_oyb);
                 }
                 ImGui::EndTooltip();
@@ -751,20 +756,8 @@ namespace box
             }
         }
 
-
-        if (!isnan(_mouse.x) && !isnan(_mouse.y) && ImGui::GetIO().MouseWheel)
-        {
-            canvas._zoom += ImGui::GetIO().MouseWheel * 0.1f;
-            if (canvas._zoom < 0.1f)
-                canvas._zoom = 0.1f;
-            set_atlas_scale(canvas, {canvas._zoom, canvas._zoom}, {_mouse.x, _mouse.y});
-        }
-        else if (!hover && !isnan(_mouse.x) && IsMouseButtonPressed(0) && !_drag._drag_origin)
-        {
-            _active = nullptr;
-        }
-
-
+        ImGui::DrawRuler(canvas);
+        ImGui::EndCanvas();
     }
 
     bool app::show_align(int32_t& x, int32_t& y, float w, float h) const
@@ -905,7 +898,8 @@ namespace box
 
         _trimed_width += _spacing;
         _trimed_height += _spacing;
-
+        _reset_atlas_canvas = _reset_comp_canvas = true;
+        add_to_history(path);
         return true;
     }
 
@@ -1023,6 +1017,24 @@ namespace box
         std::string txt;
         doc.to_string(txt);
         return SaveFileText(path, txt.data()) && r;
+    }
+
+    void app::add_to_history(const char* path)
+    {
+        if (!path)
+            return;
+
+        for (auto& el : _props.paths)
+        {
+            if (el == path)
+                return;
+        }
+
+        for (size_t n = _props.paths.size() - 1; n != 0; --n)
+        {
+            _props.paths[n] = _props.paths[n - 1];
+        }
+        _props.paths[0] = path;
     }
 
     bool app::add_file(const char* path)
@@ -1207,25 +1219,22 @@ namespace box
         _items.clear();
         _compositions.clear();
         _path.clear();
-        _active    = nullptr;
-        _atlas_canvas._zoom = {1.f};
-        _comp_canvas._zoom  = {1.f};
-        _heuristic = {};
-        _padding   = {};
-        _width     = {512};
-        _height    = {512};
-        _trim      = {};
-        _dirty     = true;
+        _active             = nullptr;
+        _atlas_canvas.zoom  = {1.f};
+        _comp_canvas.zoom   = {1.f};
+        _heuristic          = {};
+        _padding            = {};
+        _width              = {512};
+        _height             = {512};
+        _trim               = {};
+        _composite_mode     = false;
+        _dirty              = true;
+        _reset_atlas_canvas = _reset_comp_canvas = true;
     }
 
-    void app::set_atlas_scale(canvas_data& canvas, const ImVec2& scale, const ImVec2& world_point)
+    ImVec2 app::get_texture_size() const
     {
-        matrix2d new_transform({0, 0}, {scale.x, scale.y}, {0, 0}, 0);
-        auto     s               = canvas._transform.transformPoint(world_point);
-        auto c = s - new_transform.transformPoint(world_point);
-        new_transform.tx = c.x;
-        new_transform.ty = c.y;
-        canvas._transform        = new_transform;
+        return ImVec2(!_trim ? (float)_width : (float)_trimed_width, !_trim ? (float)_height : (float)_trimed_height);
     }
 
     Image app::load_cb64(msg::Var ar) const
@@ -1284,6 +1293,8 @@ namespace box
     {
         size_t hover_node = -1;
         bool   rotation_hover = false;
+        bool   focused        = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
 
         for (size_t n = 0; n < _nodes.size(); ++n)
         {
@@ -1335,12 +1346,12 @@ namespace box
             return;
         }
 
-        if (IsKeyPressed('A') && ImGui::GetIO().KeyCtrl)
+        if (focused && IsKeyPressed('A') && ImGui::GetIO().KeyCtrl)
         {
             select_all(true);
         }
 
-        if (IsMouseButtonPressed(1) && !std::isnan(_mouse.x))
+        if (focused && IsMouseButtonPressed(1) && !std::isnan(_mouse.x))
         {
             if (hover_node != -1)
             {
@@ -1349,7 +1360,7 @@ namespace box
             }
         }
 
-        if (IsMouseButtonPressed(0) && !std::isnan(_mouse.x))
+        if (focused && IsMouseButtonPressed(0) && !std::isnan(_mouse.x))
         {
             if (rotation_hover)
             {

@@ -6,6 +6,7 @@
 #include "utils/msgvar.hpp"
 #include "utils/math.hpp"
 #include "utils/matrix2d.hpp"
+#include "utils/imgui_canvas.hpp"
 
 #include <string>
 #include <vector>

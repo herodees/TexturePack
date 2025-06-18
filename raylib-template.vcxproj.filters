@@ -13,6 +13,7 @@
     <ClCompile Include="tfd\tinyfiledialogs.c" />
     <ClCompile Include="rbp\maxrects.c" />
     <ClCompile Include="source\utils\theme.cpp" />
+    <ClCompile Include="source\utils\imgui_canvas.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\include.hpp" />
@@ -35,6 +36,7 @@
     <ClInclude Include="source\app.hpp" />
     <ClInclude Include="tfd\tinyfiledialogs.h" />
     <ClInclude Include="rbp\maxrects.h" />
+    <ClInclude Include="source\utils\imgui_canvas.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="source\rc\Resource.rc" />

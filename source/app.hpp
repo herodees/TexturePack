@@ -4,6 +4,11 @@
 
 namespace box
 {
+    struct properties_t
+    {
+        std::array<std::string, 16> paths;
+    };
+
     enum sprite_data : int32_t
     {
         Defualt,
@@ -84,7 +89,7 @@ namespace box
 	class app
     {
     public:
-        app();
+        app(properties_t& props);
         ~app();
 
         void show();
@@ -98,11 +103,12 @@ namespace box
         void show_list();
         void show_composition();
         void show_texture();
-        void show_canvas(canvas_data& canvas);
+        void show_canvas(ImGui::CanvasParams& canvas);
         bool show_align(int32_t& x, int32_t& y, float w, float h) const;
 
         bool open_atlas(const char* path);
         bool save_atlas(const char* path);
+        void add_to_history(const char* path);
         bool add_file(const char* path);
         bool add_files();
         bool add_composition(const char* path);
@@ -112,43 +118,46 @@ namespace box
         const sprite* get_sprite(std::string_view spr) const;
         bool repack();
         void reset();
-
-        void set_atlas_scale(canvas_data& canvas, const ImVec2& scale, const ImVec2& world_point);
+        ImVec2 get_texture_size() const;
 
         Image    load_cb64(msg::Var ar) const;
         msg::Var save_cb64(Image img) const;
 
-        std::map<std::string, sprite> _items;
+        std::map<std::string, sprite>      _items;
         std::map<std::string, composition> _compositions;
-        sprite*                       _active{};
-        composition*                  _active_comp{};
-        composition::node             _drag_node{};
-        drag_data                     _drag{};
-        std::string                   _active_name;
-        std::string                   _active_comp_name;
-        std::vector<sprite*>          _sprites;
-        int32_t                       _heuristic{};
-        int32_t                       _padding{};
-        int32_t                       _spacing{};
-        int32_t                       _width{512};
-        int32_t                       _height{512};
-        int32_t                       _trimed_width{512};
-        int32_t                       _trimed_height{512};
-        bool                          _trim{};
-        bool                          _embed{};
-        bool                          _drop_node{};
-        bool                          _visible_origin{};
-        bool                          _visible_region{true};
-        bool                          _visible_index{};
-        bool                          _composite_mode{};
-        bool                          _dirty{};
-        std::string                   _path;
-        std::string                   _str;
-        std::vector<maxRectsSize>     _item_rect;
-        std::vector<maxRectsPosition> _item_pos;
-        canvas_data                   _atlas_canvas{};
-        canvas_data                   _comp_canvas{};
-        point2f                       _mouse{NAN, NAN};
-        Texture                       _alpha_txt{};
+        sprite*                            _active{};
+        composition*                       _active_comp{};
+        composition::node                  _drag_node{};
+        drag_data                          _drag{};
+        std::string                        _active_name;
+        std::string                        _active_comp_name;
+        std::vector<sprite*>               _sprites;
+        int32_t                            _heuristic{};
+        int32_t                            _padding{};
+        int32_t                            _spacing{};
+        int32_t                            _width{512};
+        int32_t                            _height{512};
+        int32_t                            _trimed_width{512};
+        int32_t                            _trimed_height{512};
+        bool                               _trim{};
+        bool                               _embed{};
+        bool                               _drop_node{};
+        bool                               _visible_origin{};
+        bool                               _visible_region{true};
+        bool                               _visible_index{};
+        bool                               _composite_mode{};
+        bool                               _dirty{};
+        bool                               _reset_atlas_canvas{};
+        bool                               _reset_comp_canvas{};
+        std::string                        _path;
+        std::string                        _str;
+        std::vector<maxRectsSize>          _item_rect;
+        std::vector<maxRectsPosition>      _item_pos;
+        point2f                            _mouse{NAN, NAN};
+        Texture                            _alpha_txt{};
+        ImGui::CanvasParams                _atlas_canvas{};
+        ImGui::CanvasParams                _comp_canvas{};
+        properties_t&                      _props;
+
     };
 } // namespace box

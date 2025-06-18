@@ -29,6 +29,7 @@
     <ClCompile Include="rlimgui\rlImGui.cpp" />
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="source\utils\imgui_canvas.cpp" />
     <ClCompile Include="source\utils\theme.cpp" />
     <ClCompile Include="tfd\tinyfiledialogs.c" />
   </ItemGroup>
@@ -48,6 +49,7 @@
     <ClInclude Include="rlimgui\rlImGuiColors.h" />
     <ClInclude Include="source\app.hpp" />
     <ClInclude Include="source\include.hpp" />
+    <ClInclude Include="source\utils\imgui_canvas.hpp" />
     <ClInclude Include="source\utils\math.hpp" />
     <ClInclude Include="source\utils\matrix2d.hpp" />
     <ClInclude Include="source\utils\msgbuff.hpp" />
