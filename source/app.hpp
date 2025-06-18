@@ -147,8 +147,8 @@ namespace box
         bool                               _visible_index{};
         bool                               _composite_mode{};
         bool                               _dirty{};
-        bool                               _reset_atlas_canvas{};
-        bool                               _reset_comp_canvas{};
+        bool                               _reset_atlas_canvas{true};
+        bool                               _reset_comp_canvas{true};
         std::string                        _path;
         std::string                        _str;
         std::vector<maxRectsSize>          _item_rect;
